@@ -25,7 +25,7 @@
             :items-per-page="5"
             class="elevation-1"
           >
-            <template v-slot:item.actions>
+            <template v-slot:[`item.actions`]>
               <span><v-btn @click="onClick(true)">Edit set</v-btn> </span>
               <span><v-btn>Delete</v-btn> </span>
             </template>
@@ -61,31 +61,31 @@
 
 <script>
 export default {
-  data () {
+  data() {
     return {
       isEdit: false,
       actions: ['Squat', 'Deadlift', 'BenchPress'],
       headers: [
         {
           text: 'Expected Weight',
-          value: 'expectedWeight'
+          value: 'expectedWeight',
         },
         {
           text: 'Weight Recorded',
-          value: 'weightRecorded'
+          value: 'weightRecorded',
         },
         {
           text: 'Expected Rep',
-          value: 'expectedRep'
+          value: 'expectedRep',
         },
         {
           text: 'Rep Recorded',
-          value: 'repRecorded'
+          value: 'repRecorded',
         },
         {
           text: 'Actions',
-          value: 'actions'
-        }
+          value: 'actions',
+        },
       ],
       records: {
         Squat: [
@@ -93,131 +93,131 @@ export default {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '3(-2)'
+            repRecorded: '3(-2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '87KG(+2.5)',
             expectedRep: '5',
-            repRecorded: '7(+2)'
+            repRecorded: '7(+2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '5'
+            repRecorded: '5',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '3(-2)'
+            repRecorded: '3(-2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '87KG(+2.5)',
             expectedRep: '5',
-            repRecorded: '7(+2)'
+            repRecorded: '7(+2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '5'
+            repRecorded: '5',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '3(-2)'
+            repRecorded: '3(-2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '87KG(+2.5)',
             expectedRep: '5',
-            repRecorded: '7(+2)'
+            repRecorded: '7(+2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '5'
+            repRecorded: '5',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '3(-2)'
+            repRecorded: '3(-2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '87KG(+2.5)',
             expectedRep: '5',
-            repRecorded: '7(+2)'
+            repRecorded: '7(+2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '5'
-          }
+            repRecorded: '5',
+          },
         ],
         Deadlift: [
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '3(-2)'
+            repRecorded: '3(-2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '87KG(+2.5)',
             expectedRep: '5',
-            repRecorded: '7(+2)'
+            repRecorded: '7(+2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '5'
-          }
+            repRecorded: '5',
+          },
         ],
         BenchPress: [
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '3(-2)'
+            repRecorded: '3(-2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '87KG(+2.5)',
             expectedRep: '5',
-            repRecorded: '7(+2)'
+            repRecorded: '7(+2)',
           },
           {
             expectedWeight: '85KG',
             weightRecorded: '82KG(-3)',
             expectedRep: '5',
-            repRecorded: '5'
-          }
-        ]
-      }
-    }
+            repRecorded: '5',
+          },
+        ],
+      },
+    };
   },
   methods: {
-    onSave () {
+    onSave() {
       // save data to db
-      this.isEdit = false
+      this.isEdit = false;
     },
-    onClick (isEdit) {
-      this.isEdit = isEdit
-    }
+    onClick(isEdit) {
+      this.isEdit = isEdit;
+    },
   },
   computed: {
-    aaa () {
-      return '123'
-    }
-  }
-}
+    aaa() {
+      return '123';
+    },
+  },
+};
 </script>
