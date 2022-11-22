@@ -1,5 +1,8 @@
 # personalrecord
 
+## node version
+v14.19.3
+
 ## Project setup
 ```
 npm install
