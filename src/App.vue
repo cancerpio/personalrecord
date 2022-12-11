@@ -14,6 +14,8 @@
 
     <!-- Sizes your content based upon application components -->
     <v-main>
+      <n-text-field></n-text-field>
+      <v-text-field outlined></v-text-field>
       <li v-for="(action, index) in actions" :key="index">
         <v-card class="mx-left" max-width="600">
           <v-card-title>{{ action }}</v-card-title>
@@ -38,7 +40,9 @@
             class="elevation-1"
           >
             <!-- <template slot:item><v-input></v-input></template> -->
-            <template slot:item.actions><v-btn @click="onSave()">Save</v-btn></template>
+            <template slot:item.actions
+              ><v-btn @click="onSave()">Save</v-btn></template
+            >
             <template slot:item.actions
               ><v-btn @click="onClick(false)">Cancel</v-btn></template
             >
@@ -60,7 +64,13 @@
 </template>
 
 <script>
+import NTextField from './components/NTextField.vue'
+
 export default {
+  name: 'Demo',
+  components: {
+    NTextField
+  },
   data () {
     return {
       isEdit: false,
