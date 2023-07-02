@@ -17,14 +17,14 @@
    - KafkaJS, Koa, jackson, line-bot-api-client, com.theokanning.openai-gpt3-java    
 
 # How it work (Backend)
- - LinebotHandler
+ - LinebotHandler https://github.com/cancerpio/linebot-handler-node
    - A Kafka Producer implemented in NodeJS 
    - Utilize AWS Lambda and API Gateway to handle the text event, which is a web hook received from the Linebot Platform 
    - Utilize kafkaJs to produce the user message (training performance) and reply token to kafka topic
     
  - Docker: docker-compose
    - kafka, mongodb
- - Bot Server
+ - Bot Server https://github.com/cancerpio/nextpage-line-bot-server
    - Springboot Kafka Consumer 
    - Consume the message from the user and perform the following actions: 
      - Convert the message into JSON format and retrieve training advice from OPENAI
