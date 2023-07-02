@@ -4,6 +4,8 @@
  - (TBD)Organize the training records into charts to track long-term trends.
  - (TBD) Create a training schedule.
 
+# System Diagram
+![alt text](https://github.com/cancerpio/personalrecord/blob/main/Backend%E6%9E%B6%E6%A7%8B%E5%9C%96.drawio.png)
 # Tchnique stack
  - Cloud & Container
    - AWS Lambda, API Gateway, EC2, Docker
