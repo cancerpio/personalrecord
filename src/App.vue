@@ -1,97 +1,58 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue';
-import HistoryChart from './components/HistoryChart.vue';
-import FilterControls from './components/FilterControls.vue';
-import CycleStatus from './components/CycleStatus.vue';
-import SparklineRow from './components/SparklineRow.vue';
-import { fetchChartData } from './mock/data';
+import { ref, computed } from 'vue';
+// View Imports
+import DashboardView from './views/DashboardView.vue';
+import ProgramView from './views/ProgramView.vue';
+import LogView from './views/LogView.vue';
 
-// State
-const loading = ref(true);
-const chartSeries = ref([]);
-const relativeStrengthSeries = ref([]);
-const sparklines = ref([]);
-const cycleWeeks = ref(1);
+const currentTab = ref('dashboard');
 
-const filters = ref({
-  exercise: 'all', 
-  rmType: '3RM',
-  year: new Date().getFullYear(),
-  month: new Date().getMonth() + 1
-});
-
-const loadChartData = async (currentFilters) => {
-  loading.value = true;
-  try {
-    const { series, relativeSeries, sparklines: sl, cycleWeeks: cw } = await fetchChartData(currentFilters);
-    chartSeries.value = series;
-    relativeStrengthSeries.value = relativeSeries;
-    sparklines.value = sl;
-    cycleWeeks.value = cw;
-  } catch (error) {
-    console.error('Failed to load chart data:', error);
-  } finally {
-    loading.value = false;
-  }
+const views = {
+  dashboard: DashboardView,
+  program: ProgramView,
+  log: LogView
 };
 
-watch(filters, (newVal) => {
-  loadChartData(newVal);
-}, { deep: true });
-
-onMounted(() => {
-  loadChartData(filters.value);
+const currentView = computed(() => {
+  return views[currentTab.value] || DashboardView;
 });
+
+// Tab Navigation Items
+const tabs = [
+  { id: 'dashboard', label: 'Charts', icon: 'chart' },
+  { id: 'program', label: 'Program', icon: 'list' },
+  { id: 'log', label: 'Log', icon: 'pen' }
+];
 </script>
 
 <template>
   <div class="line-mini-app safe-area">
     <div class="content-wrapper">
-      <!-- Header -->
-      <div class="header-section">
-        <div class="title-area">
-          <label class="welcome">Welcome Back</label>
-          <h1>Training Log</h1>
-        </div>
-      </div>
-
-      <!-- Cycle Status -->
-      <CycleStatus :status="'Linear'" :weeks="cycleWeeks" />
-
-      <!-- Sparklines (Performance Trends) -->
-      <div class="sparklines-container" :class="{ refreshing: loading }">
-        <SparklineRow 
-          v-for="item in sparklines" 
-          :key="item.id" 
-          :data="item" 
-        />
-      </div>
-
-      <!-- Chart Section 1: Absolute Strength & Bodyweight -->
-      <div class="chart-section" :class="{ loading: loading }">
-        <div class="section-header">
-          <h2>Performance Overview</h2>
-          <p class="section-desc">動作重量 vs 體重趨勢：觀察體重變化對力量表現的影響。</p>
-        </div>
-        <div class="chart-container glass-panel">
-          <HistoryChart :series="chartSeries" :dualAxis="true" />
-        </div>
-      </div>
-
-      <!-- Chart Section 2: Relative Strength -->
-      <div class="chart-section" :class="{ loading: loading }">
-        <div class="section-header">
-          <h2>Relative Strength</h2>
-          <p class="section-desc">相對強度 (倍率)：排除體重因素後的真實肌力水準 (動作重量 / Base Weight)。</p>
-        </div>
-        <div class="chart-container glass-panel">
-          <HistoryChart :series="relativeStrengthSeries" :dualAxis="false" yAxisLabel="Ratio" />
-        </div>
-      </div>
-
-      <!-- Filters -->
-      <FilterControls v-model:filters="filters" />
+      <!-- Debug -->
+      <!-- <div style="color: red; padding: 10px;">Current Tab: {{ currentTab }}</div> -->
+      
+      <!-- Dynamic Component View -->
+      <component :is="currentView" />
     </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav glass-nav">
+      <button 
+        v-for="tab in tabs" 
+        :key="tab.id"
+        class="nav-item"
+        :class="{ active: currentTab === tab.id }"
+        @click="currentTab = tab.id"
+      >
+        <div class="icon-box">
+          <!-- Inline SVGs for Icons -->
+          <svg v-if="tab.icon === 'chart'" viewBox="0 0 24 24" fill="none" class="nav-icon" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+          <svg v-if="tab.icon === 'list'" viewBox="0 0 24 24" fill="none" class="nav-icon" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          <svg v-if="tab.icon === 'pen'" viewBox="0 0 24 24" fill="none" class="nav-icon" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        </div>
+        <span class="nav-label">{{ tab.label }}</span>
+      </button>
+    </nav>
   </div>
 </template>
 
@@ -101,93 +62,108 @@ onMounted(() => {
   background: var(--bg-gradient);
   color: var(--text-primary);
   font-family: var(--font-primary);
-  padding: 20px;
-  overflow-y: auto;
-  padding-bottom: 120px; /* Space for fixed bottom filter */
+  padding: 0;
+  overflow-y: hidden; /* Scroll handled by content-wrapper or view */
+  position: relative;
 }
 
 .safe-area {
   padding-top: max(20px, env(safe-area-inset-top));
-  padding-bottom: max(120px, env(safe-area-inset-bottom));
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
 }
 
 .content-wrapper {
   max-width: 600px;
   margin: 0 auto;
+  padding: 20px;
+  padding-bottom: 90px; /* Adjusted space for bottom nav */
+  height: 100vh;
+  overflow-y: auto; /* Scrollable content area */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.content-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 54px; /* Native-like height (excluding safe area) */
+  padding-bottom: env(safe-area-inset-bottom);
   display: flex;
-  flex-direction: column;
-  gap: 24px;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.15); /* Thinner border */
+  box-sizing: content-box; /* Ensure padding doesn't affect height calculation */
 }
 
-.header-section {
-  padding: 0 4px;
-}
-
-.sparklines-container {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: opacity 0.3s ease;
-}
-
-.sparklines-container.refreshing {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.chart-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: opacity 0.3s ease;
-}
-
-.chart-section.loading {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.section-header h2 {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: var(--text-primary);
-}
-
-.section-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.chart-container {
-  padding: 16px;
-  border-radius: 20px;
-  min-height: 300px;
+.glass-nav {
+  background: rgba(22, 22, 30, 0.85); /* Darker, premium feel */
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
 }
 
-.title-area h1 {
-  font-size: 34px;
-  font-weight: 800;
-  margin: 0;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.nav-item {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  gap: 3px; /* Tighter gap */
+  padding: 4px 0;
+  cursor: pointer;
+  color: #8E8E93; /* iOS inactive gray */
+  transition: color 0.2s ease;
 }
 
-.welcome {
-  display: block;
-  font-size: 13px;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  letter-spacing: 1px;
-  font-weight: 600;
-  margin-bottom: 4px;
+.nav-item.active {
+  color: #a5b4fc; /* Accent color */
+}
+
+.nav-item.active .nav-icon {
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.3));
+}
+
+.icon-box {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+.nav-label {
+  font-size: 10px; /* Smaller, native size */
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

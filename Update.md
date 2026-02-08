@@ -48,6 +48,9 @@ Feature Name：line-mini-app-chart
     -   **雙 Y 軸整合**：在 Performance Overview 圖表中加入體重 (Bodyweight) 作為灰色虛線背景參考，方便觀察體重對力量的影響。
     -   **相對強度圖表**：新增獨立圖表顯示「力量/體重比 (Ratio)」，排除體重因素檢視真實肌力進步。
     -   **說明文字**：在各圖表下方加入清楚的中文功能說明。
+8.  **Navigation & Layout Structure**:
+    -   **底部導航欄 (Bottom Tab Bar)**：實作 Charts / Program / Log 分頁切換，為未來功能擴充預留空間。
+    -   **視圖重構**：將主畫面拆分為 `DashboardView`，並新增 `ProgramView` 與 `LogView` 佔位組件。
 
 ## 驗收指令
 

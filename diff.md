@@ -45,7 +45,21 @@ Feature Name：line-mini-app-chart
 - src/mock/data.js
   - 變更類型：修改
   - 變更說明：新增體重數據生成邏輯，並計算相對強度 (Ratio) 序列。
-- src/components/CycleStatus.vue
+- src/views/DashboardView.vue
+  - 說明：(新增) 從 App.vue 拆分出的儀表板視圖。
+- src/views/ProgramView.vue
+  - 說明：(新增) 課表資訊頁面 (施工中)。
+- src/views/LogView.vue
+  - 說明：(新增) 訓練紀錄輸入頁面 (施工中)。
+
+### 修改的檔案
+- vite.config.js
+  - 變更類型：修改
+  - 變更說明：新增 base path 設定以支援 GitHub Pages 部署。
+- src/App.vue
+  - 變更類型：修改(重構)
+  - 變更說明：改為導航容器 (Navigation Container)，負責顯示底部導航欄與切換視圖。
+- src/components/HistoryChart.vue
   - 變更類型：修改
   - 變更說明：新增 weeks prop 與 UI 顯示；整合專輯封面與 Alert 狀態。
 - src/components/SparklineRow.vue
