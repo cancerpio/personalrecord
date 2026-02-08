@@ -27,8 +27,17 @@ Feature Name：line-mini-app-chart
 - src/assets/images/bokuwa.jpg
   - 說明：新增專輯封面圖片資源 (用於 Cycle Status)。
 
+- .github/workflows/deploy.yml
+  - 說明：新增 GitHub Actions CI/CD 流程設定檔。
+- README.md
+  - 說明：新增部署說明文件。
+
 ### 修改的檔案
+- vite.config.js
+  - 變更類型：修改
+  - 變更說明：新增 base path 設定以支援 GitHub Pages 部署。
 - src/App.vue
+
   - 變更類型：修改
   - 變更說明：整合 SparklineRow 組件，傳遞週數資料；修改載入邏輯以避免版面跳動 (Remove v-if)。
 - src/components/CycleStatus.vue

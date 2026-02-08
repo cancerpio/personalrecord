@@ -40,6 +40,10 @@ Feature Name：line-mini-app-chart
     -   新增週期警示：超過 4 週顯示 Warning (Orange)、超過 8 週顯示 Critical (Red)，以 iOS System Colors 呈現。
     -   新增 Current Cycle 封面圖 (已存為本地資源)，確保穩定顯示。
     -   列表加入動作圖示 (Iconography) 增強識別度。
+6.  **CI/CD Pipeline**:
+    -   新增 GitHub Actions Workflow (`.github/workflows/deploy.yml`) 自動部署至 GitHub Pages。
+    -   設定 `vite.config.js` base path 為 `/personalrecord/`。
+    -   更新 `README.md` 包含部署教學。
 
 ## 驗收指令
 
