@@ -20,8 +20,16 @@ This project is configured to deploy automatically to GitHub Pages using GitHub 
     - You can monitor the progress in the **Actions** tab.
 
 4.  **Access Your Site**:
-    - Once the workflow completes, your site will be live at: `https://<your-username>.github.io/personalrecord/`
-    - (e.g., `https://cancerpio.github.io/personalrecord/`)
+    - Current Production URL: **[https://cancerpio.github.io/personalrecord/](https://cancerpio.github.io/personalrecord/)**
+
+### Troubleshooting: "Branch is not allowed to deploy"
+
+If your deployment fails with `Branch "mini-app" is not allowed to deploy to github-pages due to environment protection rules`, follow these steps:
+
+1.  Go to your GitHub Repository **Settings**.
+2.  Select **Environments** from the sidebar.
+3.  Click on **github-pages**.
+4.  Under **Deployment branches**, click **Manage rules** (or similar) and add your branch name (e.g., `mini-app`) to the allowed list, or choose **No restriction**.
 
 ### Important Configuration Note
 
