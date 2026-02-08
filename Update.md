@@ -44,6 +44,10 @@ Feature Name：line-mini-app-chart
     -   新增 GitHub Actions Workflow (`.github/workflows/deploy.yml`) 自動部署至 GitHub Pages。
     -   設定 `vite.config.js` base path 為 `/personalrecord/`。
     -   更新 `README.md` 包含部署教學。
+7.  **Chart Enhancements (Bodyweight & Relative Strength)**:
+    -   **雙 Y 軸整合**：在 Performance Overview 圖表中加入體重 (Bodyweight) 作為灰色虛線背景參考，方便觀察體重對力量的影響。
+    -   **相對強度圖表**：新增獨立圖表顯示「力量/體重比 (Ratio)」，排除體重因素檢視真實肌力進步。
+    -   **說明文字**：在各圖表下方加入清楚的中文功能說明。
 
 ## 驗收指令
 

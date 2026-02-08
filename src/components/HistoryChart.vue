@@ -2,58 +2,95 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-  series:Array,
-  loading: Boolean
+  series: {
+    type: Array,
+    default: () => []
+  },
+  loading: Boolean,
+  dualAxis: {
+    type: Boolean,
+    default: false
+  },
+  title: {
+    type: String,
+    default: ''
+  },
+  yAxisLabel: {
+    type: String,
+    default: 'Weight (kg)'
+  }
 });
 
 const chartOptions = computed(() => ({
   chart: {
-    type: 'spline',
+    type: 'area', // Mixed types (area, line) handled in series config
     backgroundColor: 'transparent',
     style: {
       fontFamily: 'Inter, sans-serif'
     },
-    animation: true
+    animation: true,
+    height: 300,
+    spacingTop: 20
   },
   title: { text: '' },
   xAxis: {
     type: 'datetime',
     labels: {
-      style: { color: '#8E8E93' }
+      style: { color: '#8E8E93' },
+      format: '{value:%b %d}'
     },
     gridLineColor: 'rgba(255,255,255,0.1)',
-    lineColor: 'transparent',
+    lineColor: 'rgba(255,255,255,0.1)', // Updated from transparent
     tickColor: 'transparent'
   },
-  yAxis: {
-    title: { text: null },
-    labels: {
-      style: { color: '#8E8E93' }
+  yAxis: props.dualAxis ? [
+    { // Primary Axis (Left - Weight)
+      title: { text: null },
+      gridLineColor: 'rgba(255,255,255,0.05)',
+      labels: { style: { color: '#8E8E93' } }
     },
-    gridLineColor: 'rgba(142, 142, 147, 0.2)'
+    { // Secondary Axis (Right - Bodyweight)
+      title: { text: null },
+      opposite: true,
+      gridLineWidth: 0,
+      labels: { 
+        style: { color: '#8E8E93' },
+        format: '{value} kg'
+      }
+    }
+  ] : { // Single Axis
+    title: { text: null },
+    gridLineColor: 'rgba(255,255,255,0.05)',
+    labels: { 
+      style: { color: '#8E8E93' },
+      format: props.yAxisLabel === 'Ratio' ? '{value}x' : '{value}'
+    }
   },
   legend: {
-    itemStyle: { color: 'var(--text-primary)' },
-    itemHoverStyle: { color: 'var(--accent-color)' }
+    enabled: true,
+    itemStyle: { color: '#ffffff', fontWeight: 'normal' },
+    itemHoverStyle: { color: '#ffffff' }
   },
   tooltip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    backdropFilter: 'blur(10px)',
+    shared: true,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    style: { color: '#ffffff' },
     borderRadius: 12,
     borderWidth: 0,
-    shadow: true,
-    style: { color: '#000' }
+    shadow: false,
+    headerFormat: '<span style="font-size: 10px">{point.key:%b %d}</span><br/>'
   },
   series: props.series,
   credits: { enabled: false },
   plotOptions: {
-    spline: {
-      marker: {
-        enabled: true,
-        radius: 4,
-        symbol: 'circle'
-      },
-      lineWidth: 3
+    area: {
+      marker: { enabled: false },
+      fillOpacity: 0.15,
+      lineWidth: 2
+    },
+    line: {
+      marker: { enabled: false },
+      lineWidth: 2
     }
   }
 }));

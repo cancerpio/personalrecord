@@ -37,9 +37,14 @@ Feature Name：line-mini-app-chart
   - 變更類型：修改
   - 變更說明：新增 base path 設定以支援 GitHub Pages 部署。
 - src/App.vue
-
   - 變更類型：修改
-  - 變更說明：整合 SparklineRow 組件，傳遞週數資料；修改載入邏輯以避免版面跳動 (Remove v-if)。
+  - 變更說明：實作雙圖表佈局 (Performance & Relative Strength)，整合新數據流。
+- src/components/HistoryChart.vue
+  - 變更類型：修改
+  - 變更說明：支援雙 Y 軸 (Dual Axis) 與自定義 Y 軸標籤 (Ratio)，增強圖表顯示彈性。
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：新增體重數據生成邏輯，並計算相對強度 (Ratio) 序列。
 - src/components/CycleStatus.vue
   - 變更類型：修改
   - 變更說明：新增 weeks prop 與 UI 顯示；整合專輯封面與 Alert 狀態。

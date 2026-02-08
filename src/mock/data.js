@@ -16,10 +16,10 @@ function generateDateSeries(year, month) {
 }
 
 export const EXERCISES = [
-    { id: 'squat', name: 'Squat', color: '#FF3B30' },
-    { id: 'bench', name: 'Bench Press', color: '#007AFF' },
-    { id: 'deadlift', name: 'Deadlift', color: '#34C759' },
-    { id: 'ohp', name: 'Overhead Press', color: '#FF9500' }
+    { id: 'squat', name: 'Squat', color: '#FF3B30', icon: '🏋️' },
+    { id: 'bench', name: 'Bench Press', color: '#007AFF', icon: '💪' },
+    { id: 'deadlift', name: 'Deadlift', color: '#34C759', icon: '🧹' },
+    { id: 'ohp', name: 'Overhead Press', color: '#FF9500', icon: '🆙' }
 ];
 
 export const RM_TYPES = ['3RM', '5RM', 'PR'];
@@ -55,37 +55,82 @@ export async function fetchChartData({ exercise, rmType, year, month }) {
                 return {
                     name: ex.name,
                     data: data,
-                    color: ex.color
+                    color: ex.color,
+                    yAxis: 0 // Primary axis (Weight)
                 };
             });
 
-            const cycleWeeks = getRandomInt(1, 10);
+            // Generate Bodyweight Data (simulating slight fluctuation around 75kg)
+            const bodyweightData = dates.map(date => {
+                const day = parseInt(date.split('-')[2]);
+                const fluctuation = Math.sin(day / 5) * 1.5; // Smooth wave
+                const noise = Math.random() * 0.5;
+                return {
+                    x: new Date(date).getTime(),
+                    y: parseFloat((75 + fluctuation + noise).toFixed(1))
+                };
+            });
 
-            const sparklines = EXERCISES.map(ex => {
-                // Generate small trend for sparkline (last 10 sessions)
-                const trendData = Array.from({ length: 10 }, (_, i) => {
-                    return 100 + (i * (Math.random() > 0.4 ? 1 : -0.5)) + getRandomInt(-2, 2);
+            const bodyweightSeries = {
+                name: 'Base Weight', // Updated name as requested
+                data: bodyweightData,
+                color: '#8E8E93', // iOS System Gray
+                dashStyle: 'ShortDash',
+                type: 'line',
+                marker: { enabled: false }, // Cleaner look
+                yAxis: 1 // Secondary axis (Bodyweight)
+            };
+
+            // Calculate Relative Strength (Weight / Bodyweight)
+            const relativeSeries = series.map(s => {
+                const relData = s.data.map((point, index) => {
+                    if (!bodyweightData[index]) return null;
+                    const bw = bodyweightData[index].y;
+                    const ratio = point.y / bw;
+                    return {
+                        x: point.x,
+                        y: parseFloat(ratio.toFixed(2))
+                    };
                 });
 
-                const last = trendData[trendData.length - 1];
-                const first = trendData[0];
-                const status = last > first + 2 ? 'up' : (last < first - 2 ? 'down' : 'stable');
-
                 return {
-                    id: ex.id,
-                    name: ex.name,
-                    icon: ex.icon, // Add icon access
-                    data: trendData,
-                    status: status // up, down, stable
+                    name: s.name + ' (Ratio)',
+                    data: relData,
+                    color: s.color,
+                    type: 'line' // Line chart for ratios is better
                 };
             });
 
+            const cycleWeeks = getRandomInt(1, 12); // Range increased to test alerts (1-12 weeks)
+
+            // Calculate mini-charts (sparklines) data 
+            // Only return last 7 points for clean UI
+            const sparklines = selectedExercises.map(ex => {
+                // Find the full series data for this exercise
+                const fullSeries = series.find(s => s.name === ex.name);
+                if (fullSeries) {
+                    const trendData = fullSeries.data.slice(-7).map(p => p.y);
+                    // Simple trend calc
+                    const first = trendData[0];
+                    const last = trendData[trendData.length - 1];
+                    const status = last > first ? 'up' : (last < first ? 'down' : 'stable');
+
+                    return {
+                        id: ex.id,
+                        name: ex.name,
+                        icon: ex.icon, // Add icon access
+                        data: trendData,
+                        status: status // up, down, stable
+                    };
+                }
+                return null;
+            }).filter(Boolean); // Filter out nulls
+
             resolve({
-                series,
-                cycle: Math.random() > 0.5 ? 'Linear' : 'Texas', // Randomly return cycle status
-                cycleWeeks,
+                series: [...series, bodyweightSeries], // Combine for main chart
+                relativeSeries: relativeSeries, // Separate for new chart
                 sparklines,
-                meta: { year, month, rmType }
+                cycleWeeks
             });
         }, 600); // 600ms delay
     });
