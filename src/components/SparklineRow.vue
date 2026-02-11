@@ -9,9 +9,13 @@ const props = defineProps({
 // Helper to determine arrow and color based on status
 const statusInfo = computed(() => {
   switch (props.data.status) {
-    case 'up': return { icon: '↗', color: 'var(--success-color)', label: 'Trending Up' };
-    case 'down': return { icon: '↘', color: 'var(--danger-color)', label: 'Trending Down' };
-    default: return { icon: '→', color: 'var(--text-secondary)', label: 'Stable' };
+    case 'up':
+      return { icon: '↗', color: 'var(--success-color)', label: 'Trending Up' };
+    case 'down':
+      return { icon: '↘', color: 'var(--danger-color)', label: 'Trending Down' };
+    default:
+      // 當訓練數值沒有明顯變化時，給一點情勒
+      return { icon: '→', color: 'var(--text-secondary)', label: 'Stable（尬電，你真的有在練嗎）' };
   }
 });
 
