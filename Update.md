@@ -69,3 +69,104 @@ npm run dev
 4. 點擊 "RM Type" (3RM/5RM/PR) 或切換 "Exercise"，圖表應在短暫載入後更新。
 5. "Current Cycle" 卡片應隨機顯示 "Linear Mode" 或 "Texas Mode"。
 6. 整體介面應呈現半透明毛玻璃質感。
+
+---
+
+## 本次調整：training-progress-metrics
+
+### 實際修改的檔案
+- `src/mock/data.js`
+  - 將原本隨機產生的 Squat / Bench Press / Deadlift / Overhead Press + 體重資料，改為：
+    - 僅保留 Squat 以及三種 RM 類型 (3RM / 5RM / PR)。
+    - 新增固定 4 週的 Body Weight、Body Fat、VO2 max 資料。
+    - 每週資料使用固定時間戳 (以天為單位)，符合 Dashboard 現有時間軸呈現。
+    - Relative Strength 圖表改為只顯示「Squat / Body Weight」倍率。
+    - Sparklines 只保留 Squat，一樣顯示 4 週趨勢。
+
+- `Update.md`
+  - 新增本次 Feature `training-progress-metrics` 的更新說明與驗收方式。
+
+- `diff.md`
+  - 新增對應的變更記錄與還原說明條目。
+
+### 後續調整（單一 Y 軸 / 只保留 kg）
+
+- `src/mock/data.js`
+  - （第一階段）移除 Body Fat 與 VO2 max 資料與 series，僅輸出：
+    - Squat (3RM / 5RM / PR=1RM)。
+    - Body Weight（kg）。
+  - （第二階段）依需求再度加入 Body Fat，並以 kg 顯示：
+    - Body Fat：19, 21, 19, 17（視為 kg 數值）。
+  - 所有 series（Squat / Body Weight / Body Fat）皆共用同一個 Y 軸 (`yAxis: 0`)，統一使用 kg 單位。
+
+- `src/views/DashboardView.vue`
+  - 將第一張圖表的 `HistoryChart` 從 `:dualAxis="true"` 改為單一 Y 軸（移除 `dualAxis` 設定），畫面上不再出現左右兩側不同刻度，並在說明文字中標註單位為 kg。
+  - 將第二張圖改為顯示「體脂率 (Body Fat / Body Weight)」，標題更新為 Body Fat Percentage，說明文字不再重複描述基準敘述，Y 軸標籤改為 "Body Fat %"。
+
+### 本階段調整（Bench Press 與 RM 排序）
+
+- `src/mock/data.js`
+  - 新增 Bench Press 固定 4 週資料（依 RM 類型分別為 3RM / 5RM / PR）：
+    - Bench Press 3RM：75, 75, 75, 77.5
+    - Bench Press 5RM：65, 65, 67.5, 67.5
+    - Bench Press PR：85, 85, 85, 85
+  - 新增 `benchSeries`，在 Performance Overview 圖表中與 Squat、Body Weight、Body Fat 一同顯示。
+  - 調整 `RM_TYPES` 順序為：`['5RM', '3RM', 'PR']`，讓 RM 切換按鈕依「由弱到強」排列。
+
+### 本階段調整（配色：群組相近 & iOS Style）
+
+- `src/mock/data.js`
+  - 調整動作類（Squat / Bench Press）顏色為接近的 iOS 藍色系：
+    - Squat：`#0A84FF`（iOS System Blue）
+    - Bench Press：`#5AC8FA`（iOS System Teal）
+  - 調整身體指標類（Body Weight / Body Fat）為接近的灰色系：
+    - Body Weight：`#8E8E93`（iOS System Gray）
+    - Body Fat：`#AEAEB2`（iOS System Gray2）
+
+### 本階段調整（Performance Overview 上方趨勢區塊）
+
+- `src/mock/data.js`
+  - 擴充 `sparklines` 資料，使 Sparklines 區塊同時顯示：
+    - Squat（依 RM 切換：3RM / 5RM / PR）
+    - Bench Press（依 RM 切換：3RM / 5RM / PR）
+    - Body Weight（固定 79, 80, 80, 81，不受 RM 影響）
+    - Body Fat（固定 19, 21, 19, 17，不受 RM 影響）
+  - 每個項目皆提供 4 週資料與趨勢狀態（up / down / stable），確保在切換 RM 時，Squat / Bench 會正確反映不同 RM 的趨勢，而 Body Weight / Body Fat 保持穩定或緩變。
+
+### 驗收補充
+
+在原本驗收流程基礎上，再確認：
+
+1. 主圖表的 Y 軸只剩下單一側刻度，代表 kg。
+2. 圖上只會顯示：
+   - Squat (依 RM 切換：3RM / 5RM / PR)。
+   - Body Weight（79, 80, 80, 81）。
+   - Body Fat（19, 21, 19, 17，以 kg 呈現）。
+3. 不再出現 VO2 max 線條或圖例。
+4. 第二張圖的折線代表體脂率 (Body Fat / Body Weight × 100)，Y 軸單位為 %。
+
+### 驗收步驟（延續原專案啟動流程）
+
+```bash
+# 安裝依賴 (如果尚未安裝)
+npm install
+
+# 啟動開發伺服器
+npm run dev
+```
+
+啟動後：
+1. 進入 Dashboard（Charts / Performance 畫面）。
+2. 主圖表只會顯示：
+   - Squat (依目前 RM 切換：3RM / 5RM / PR)。
+   - Body Weight / Body Fat / VO2 max 三條線在次 Y 軸。
+3. 切換 RM 按鈕時：
+   - Squat 曲線的 4 週數值依照下列規則更新：
+     - 5RM：90, 90, 100, 105
+     - 3RM：100, 105, 110, 110
+     - PR (視為 1RM)：125, 130, 130, 130
+   - Body Weight：79, 80, 80, 81（固定不隨 RM 改變）
+   - Body Fat：23, 24, 21, 20（固定不隨 RM 改變）
+   - VO2 max：40, 40, 39, 39（固定不隨 RM 改變）
+4. 下方 Relative Strength 圖表應只顯示一條「Squat / Body Weight」倍率曲線。
+5. Sparklines 區域只會有 Squat 一個項目，顯示 4 週趨勢。

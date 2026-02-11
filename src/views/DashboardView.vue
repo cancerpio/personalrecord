@@ -50,7 +50,7 @@ onMounted(() => {
     <div class="header-section">
       <div class="title-area">
         <label class="welcome">Welcome Back</label>
-        <h1>Strength Analytics</h1>
+        <h1>Strength and Conditioning Analytics</h1>
       </div>
     </div>
 
@@ -70,21 +70,21 @@ onMounted(() => {
     <div class="chart-section" :class="{ loading: loading }">
       <div class="section-header">
         <h2>Performance Overview</h2>
-        <p class="section-desc">動作重量 vs 體重趨勢：觀察體重變化對力量表現的影響。</p>
+        <p class="section-desc">動作重量 vs 體重趨勢（單位：kg）。</p>
       </div>
       <div class="chart-container glass-panel">
-        <HistoryChart :series="chartSeries" :dualAxis="true" />
+        <HistoryChart :series="chartSeries" />
       </div>
     </div>
 
-    <!-- Chart Section 2: Relative Strength -->
+    <!-- Chart Section 2: Body Fat Percentage -->
     <div class="chart-section" :class="{ loading: loading }">
       <div class="section-header">
-        <h2>Relative Strength</h2>
-        <p class="section-desc">相對強度 (倍率)：排除體重因素後的真實肌力水準 (動作重量 / Base Weight)。</p>
+        <h2>Body Fat Percentage</h2>
+        <p class="section-desc">體脂率 (Body Fat / Body Weight)。</p>
       </div>
       <div class="chart-container glass-panel">
-        <HistoryChart :series="relativeStrengthSeries" :dualAxis="false" yAxisLabel="Ratio" />
+        <HistoryChart :series="relativeStrengthSeries" :dualAxis="false" yAxisLabel="Body Fat %" />
       </div>
     </div>
 

@@ -99,3 +99,345 @@ rm -rf node_modules
 # 如果不需要備份目錄
 # rm -rf .cursor/backups/20260208_192000_line-mini-app-chart/
 ```
+
+---
+
+# Feature training-progress-metrics 變更記錄
+
+執行時間：2026-02-11T21:05:00+08:00
+Feature Name：training-progress-metrics
+調整類型：調整功能
+備份目錄：./backups/20260211_210500_training-progress-metrics/
+
+## 變更摘要（第一階段）
+
+### 修改的檔案
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 主圖表改為只顯示 Squat (依 RM 類型切換) + Body Weight + Body Fat + VO2 max 四種指標。
+    - 資料改為固定 4 週時間點與固定數值，不再使用隨機產生。
+    - Relative Strength 圖表改為只顯示「Squat / Body Weight」倍率。
+    - Sparklines 只保留 Squat 一個項目。
+  - 備份位置：`./backups/20260211_210500_training-progress-metrics/src/mock/data.js`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：新增本次 training-progress-metrics 更新摘要與驗收步驟。
+  - 備份位置：`./backups/20260211_210500_training-progress-metrics/Update.md`
+
+- diff.md
+  - 變更類型：修改
+  - 變更說明：新增 training-progress-metrics Feature 的變更記錄與還原說明。
+  - 備份位置：`./backups/20260211_210500_training-progress-metrics/diff.md`
+
+## 還原方式（第一階段）
+
+### 步驟 1：恢復備份檔案
+
+```bash
+cp ./backups/20260211_210500_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_210500_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_210500_training-progress-metrics/diff.md diff.md
+```
+
+### 步驟 2：驗證
+
+```bash
+npm run dev
+```
+
+確認 Dashboard 圖表恢復到本次調整前的狀態。
+
+---
+
+## 變更摘要（第二階段：單一 Y 軸 / 移除 VO2 max & Body Fat）
+
+執行時間：2026-02-11T21:15:00+08:00
+備份目錄：./backups/20260211_211500_training-progress-metrics/
+
+### 修改的檔案
+
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 移除 Body Fat 與 VO2 max 的資料與 series。
+    - 只保留 Squat (3RM / 5RM / PR=1RM) 與 Body Weight（kg）。
+    - 將 Body Weight 的 `yAxis` 調整為與 Squat 相同的主軸 (`yAxis: 0`)，統一以 kg 顯示。
+  - 備份位置：`./backups/20260211_211500_training-progress-metrics/src/mock/data.js`
+
+- src/views/DashboardView.vue
+  - 變更類型：修改
+  - 變更說明：
+    - 將 `HistoryChart` 的 `:dualAxis="true"` 改為使用單一 Y 軸（移除 `dualAxis` 設定）。
+  - 備份位置：`./backups/20260211_211500_training-progress-metrics/src/views/DashboardView.vue`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：
+    - 補充說明本階段移除 Body Fat / VO2 max 與單一 Y 軸 (kg) 的調整內容與驗收步驟。
+  - 備份位置：`./backups/20260211_211500_training-progress-metrics/Update.md`
+
+- diff.md
+  - 變更類型：修改
+  - 變更說明：
+    - 新增本階段的變更摘要與還原方式。
+  - 備份位置：`./backups/20260211_211500_training-progress-metrics/diff.md`
+
+## 還原方式（第二階段）
+
+### 步驟 1：恢復備份檔案
+
+```bash
+cp ./backups/20260211_211500_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_211500_training-progress-metrics/src/views/DashboardView.vue src/views/DashboardView.vue
+cp ./backups/20260211_211500_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_211500_training-progress-metrics/diff.md diff.md
+```
+
+### 步驟 2：驗證
+
+```bash
+npm run dev
+```
+
+確認 Dashboard 圖表為單一 Y 軸（kg），且只顯示 Squat 與 Body Weight，沒有 Body Fat 與 VO2 max。
+
+---
+
+## 變更摘要（第三階段：Body Fat 以 kg 顯示）
+
+執行時間：2026-02-11T21:25:00+08:00  
+備份目錄：./backups/20260211_212500_training-progress-metrics/
+
+### 修改的檔案
+
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 新增 Body Fat 的 4 週資料（19, 21, 19, 17），並以 kg 數值呈現。
+    - 新增 `bodyFatSeries`，與 Squat、Body Weight 共用同一個 Y 軸 (`yAxis: 0`，kg)。
+  - 備份位置：`./backups/20260211_212500_training-progress-metrics/src/mock/data.js`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：
+    - 補充 Body Fat 以 kg 顯示的說明與驗收預期。
+  - 備份位置：`./backups/20260211_212500_training-progress-metrics/Update.md`
+
+- diff.md
+  - 變更類型：修改
+  - 變更說明：
+    - 新增第三階段的變更摘要與還原方式。
+  - 備份位置：`./backups/20260211_212500_training-progress-metrics/diff.md`
+
+## 還原方式（第三階段）
+
+### 步驟 1：恢復備份檔案
+
+```bash
+cp ./backups/20260211_212500_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_212500_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_212500_training-progress-metrics/diff.md diff.md
+```
+
+### 步驟 2：驗證
+
+```bash
+npm run dev
+```
+
+確認 Dashboard 圖表仍為單一 Y 軸（kg），且顯示 Squat、Body Weight、Body Fat 三條線（全部以 kg 呈現），無 VO2 max。
+
+---
+
+## 變更摘要（第四階段：Relative Strength → Body Fat Percentage）
+
+執行時間：2026-02-11T21:40:00+08:00  
+備份目錄：./backups/20260211_214000_training-progress-metrics/
+
+### 修改的檔案
+
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 將原本的相對強度計算（Squat / Body Weight）改為「體脂率 = Body Fat / Body Weight × 100」。
+    - 更新 relativeSeries 的名稱為 `Body Fat % (Body Fat / Body Weight)`。
+  - 備份位置：`./backups/20260211_214000_training-progress-metrics/src/mock/data.js`
+
+- src/views/DashboardView.vue
+  - 變更類型：修改
+  - 變更說明：
+    - 將第二張圖的標題由 Relative Strength 改為 Body Fat Percentage。
+    - 更新說明文字為「體脂率 (Body Fat / Body Weight)：以體重為基準，觀察體脂相對變化。」。
+    - 將第二張圖的 Y 軸標籤從 "Ratio" 改為 "Body Fat %"。
+  - 備份位置：`./backups/20260211_214000_training-progress-metrics/src/views/DashboardView.vue`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：
+    - 補充第二張圖改為體脂率百分比圖的描述與驗收要點。
+  - 備份位置：`./backups/20260211_214000_training-progress-metrics/Update.md`
+
+- diff.md
+  - 變更類型：修改
+  - 變更說明：
+    - 新增第四階段變更內容與還原方式說明。
+  - 備份位置：`./backups/20260211_214000_training-progress-metrics/diff.md`
+
+## 還原方式（第四階段）
+
+### 步驟 1：恢復備份檔案
+
+```bash
+cp ./backups/20260211_214000_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_214000_training-progress-metrics/src/views/DashboardView.vue src/views/DashboardView.vue
+cp ./backups/20260211_214000_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_214000_training-progress-metrics/diff.md diff.md
+```
+
+### 步驟 2：驗證
+
+```bash
+npm run dev
+```
+
+確認第二張圖為「Body Fat Percentage」，圖上線條為 Body Fat / Body Weight × 100 的百分比，Y 軸標籤顯示 "Body Fat %"。
+
+---
+
+## 變更摘要（第五階段：新增 Bench Press & 調整 RM 排序）
+
+執行時間：2026-02-11T21:45:00+08:00  
+備份目錄：./backups/20260211_214500_training-progress-metrics/
+
+### 修改的檔案
+
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 新增 Bench Press 的 4 週 RM 資料：
+      - 3RM：75, 75, 75, 77.5
+      - 5RM：65, 65, 67.5, 67.5
+      - PR：85, 85, 85, 85
+    - 新增 `benchSeries`，在 Performance Overview 圖中與 Squat、Body Weight、Body Fat 一起顯示。
+    - 調整 `RM_TYPES` 為 `['5RM', '3RM', 'PR']`，讓 RM 切換按鈕依「由弱到強」排列。
+  - 備份位置：`./backups/20260211_214500_training-progress-metrics/src/mock/data.js`
+
+- src/views/DashboardView.vue
+  - 變更類型：修改
+  - 變更說明：
+    - Performance Overview 區塊說明文字中補充「（單位：kg）」以註明主圖單位。
+    - Body Fat Percentage 區塊說明文字移除「以體重為基準，觀察體脂相對變化。」片語，保持簡潔。
+  - 備份位置：`./backups/20260211_214500_training-progress-metrics/src/views/DashboardView.vue`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：
+    - 補充 Bench Press 數據與 RM 排序調整的說明與驗收重點。
+  - 備份位置：`./backups/20260211_214500_training-progress-metrics/Update.md`
+
+- diff.md
+  - 變更類型：修改
+  - 變更說明：
+    - 新增第五階段的變更摘要與還原方式。
+  - 備份位置：`./backups/20260211_214500_training-progress-metrics/diff.md`
+
+## 還原方式（第五階段）
+
+### 步驟 1：恢復備份檔案
+
+```bash
+cp ./backups/20260211_214500_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_214500_training-progress-metrics/src/views/DashboardView.vue src/views/DashboardView.vue
+cp ./backups/20260211_214500_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_214500_training-progress-metrics/diff.md diff.md
+```
+
+### 步驟 2：驗證
+
+```bash
+npm run dev
+```
+
+確認：
+- Performance Overview 圖中同時顯示 Squat、Bench Press、Body Weight、Body Fat 四條線，說明文字包含「（單位：kg）」。
+- RM 按鈕順序為 5RM、3RM、PR。
+
+---
+
+## 變更摘要（第六階段：配色調整 iOS Style）
+
+執行時間：2026-02-11T21:50:00+08:00  
+備份目錄：./backups/20260211_215000_training-progress-metrics/
+
+### 修改的檔案
+
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 將 Squat / Bench Press 配色調整為接近的藍色系，符合 iOS System Colors：
+      - Squat：`#0A84FF`（System Blue）
+      - Bench Press：`#5AC8FA`（System Teal）
+    - 將 Body Weight / Body Fat 配色調整為接近的灰色系：
+      - Body Weight：`#8E8E93`（System Gray）
+      - Body Fat：`#AEAEB2`（System Gray2）
+    - 讓「動作類」與「身體指標類」各自成為一組視覺相近的色彩。
+  - 備份位置：`./backups/20260211_215000_training-progress-metrics/src/mock/data.js`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：
+    - 補充本階段配色調整的說明與設計依據（iOS Style）。
+  - 備份位置：`./backups/20260211_215000_training-progress-metrics/Update.md`
+
+### 還原方式（第六階段）
+
+```bash
+cp ./backups/20260211_215000_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_215000_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_215000_training-progress-metrics/diff.md diff.md
+```
+
+執行 `npm run dev` 後，確認：
+- Squat / Bench Press 線條為接近的藍色系。
+- Body Weight / Body Fat 線條為接近的灰色系。
+
+---
+
+## 變更摘要（第七階段：Performance Overview 上方趨勢擴充）
+
+執行時間：2026-02-11T21:55:00+08:00  
+備份目錄：./backups/20260211_215500_training-progress-metrics/
+
+### 修改的檔案
+
+- src/mock/data.js
+  - 變更類型：修改
+  - 變更說明：
+    - 將 `sparklines` 從只顯示 Squat 擴充為四個指標：
+      - Squat：使用當前 RM 對應的 4 週數值。
+      - Bench Press：使用當前 RM 對應的 4 週數值。
+      - Body Weight：使用固定的 4 週體重資料（79, 80, 80, 81）。
+      - Body Fat：使用固定的 4 週體脂「kg 值」（19, 21, 19, 17）。
+    - 為每個項目計算趨勢狀態（up / down / stable），供 Sparklines 元件使用。
+    - 確保切換 RM 時，Squat / Bench 的迷你圖趨勢會跟著更新，Body Weight / Body Fat 則維持各自的固定趨勢。
+  - 備份位置：`./backups/20260211_215500_training-progress-metrics/src/mock/data.js`
+
+- Update.md
+  - 變更類型：修改
+  - 變更說明：
+    - 補充 Performance Overview 上方 Sparklines 區塊擴充為四個指標的說明與驗收重點。
+  - 備份位置：`./backups/20260211_215500_training-progress-metrics/Update.md`
+
+### 還原方式（第七階段）
+
+```bash
+cp ./backups/20260211_215500_training-progress-metrics/src/mock/data.js src/mock/data.js
+cp ./backups/20260211_215500_training-progress-metrics/Update.md Update.md
+cp ./backups/20260211_215500_training-progress-metrics/diff.md diff.md
+```
+
+執行 `npm run dev` 後，確認：
+- Performance Overview 上方的 Sparklines 依序顯示 Squat、Bench Press、Body Weight、Body Fat 的 4 週趨勢。
+- 切換 RM 時，Squat / Bench 的趨勢會切換到對應 RM 的數值，而 Body Weight / Body Fat 不受 RM 影響。

@@ -1,137 +1,161 @@
-// Utility to generate random data
-function getRandomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function generateDateSeries(year, month) {
-    const dates = [];
-    const daysInMonth = new Date(year, month, 0).getDate();
-    for (let i = 1; i <= daysInMonth; i++) {
-        // Generate some random dates to have data points
-        if (i % 3 === 0) { // Every 3rd day
-            dates.push(`${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`);
-        }
+// 固定 4 週時間點（以天為單位的時間戳）
+function generateWeekTimestamps(year, month) {
+    const timestamps = [];
+    const baseDate = new Date(year, month - 1, 1); // 該月份的第 1 天
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    for (let i = 0; i < 4; i++) {
+        timestamps.push(new Date(baseDate.getTime() + i * oneWeekMs).getTime());
     }
-    return dates;
+    return timestamps;
 }
 
 export const EXERCISES = [
-    { id: 'squat', name: 'Squat', color: '#FF3B30', icon: '🏋️' },
-    { id: 'bench', name: 'Bench Press', color: '#007AFF', icon: '💪' },
-    { id: 'deadlift', name: 'Deadlift', color: '#34C759', icon: '🧹' },
-    { id: 'ohp', name: 'Overhead Press', color: '#FF9500', icon: '🆙' }
+    // 動作類：使用接近的藍色系（iOS System Blue / Teal）
+    { id: 'squat', name: 'Squat', color: '#0A84FF', icon: '🏋️' },   // iOS System Blue
+    { id: 'bench', name: 'Bench Press', color: '#5AC8FA', icon: '💪' } // iOS System Teal
 ];
 
-export const RM_TYPES = ['3RM', '5RM', 'PR'];
+// RM 按鈕顯示順序：5RM → 3RM → PR（由弱到強）
+export const RM_TYPES = ['5RM', '3RM', 'PR'];
+
+// 固定的 Squat / Bench Press / 體重 / 體脂 資料（4 週，全部以 kg 呈現）
+const SQUAT_DATA = {
+    '5RM': [90, 90, 100, 105],
+    '3RM': [100, 105, 110, 110],
+    // PR 對應使用 1RM 資料
+    'PR': [125, 130, 130, 130]
+};
+
+const BENCH_DATA = {
+    '3RM': [75, 75, 75, 77.5],
+    '5RM': [65, 65, 67.5, 67.5],
+    'PR': [85, 85, 85, 85]
+};
+
+const BODY_WEIGHT_DATA = [79, 80, 80, 81];
+const BODY_FAT_DATA = [19, 21, 19, 17];
 
 export async function fetchChartData({ exercise, rmType, year, month }) {
-    // Simulate API delay
+    // 模擬 API 延遲
     return new Promise((resolve) => {
         setTimeout(() => {
-            const dates = generateDateSeries(year, month);
+            const timestamps = generateWeekTimestamps(year, month);
 
-            // Determine which exercises to return
-            const selectedExercises = exercise === 'all'
-                ? EXERCISES
-                : EXERCISES.filter(e => e.id === exercise);
+            // 依照 RM 類型決定 Squat / Bench 數值，預設使用 3RM
+            const squatValues = SQUAT_DATA[rmType] || SQUAT_DATA['3RM'];
+            const benchValues = BENCH_DATA[rmType] || BENCH_DATA['3RM'];
 
-            const series = selectedExercises.map(ex => {
-                // Generate trend data based on exercise type to look realistic
-                const baseWeight = ex.id === 'deadlift' ? 140 :
-                    ex.id === 'squat' ? 120 :
-                        ex.id === 'bench' ? 80 : 50; // OHP
-
-                const data = dates.map(date => {
-                    // Add some random fluctuation and a slight upward trend
-                    const day = parseInt(date.split('-')[2]);
-                    const trend = day * 0.5;
-                    const noise = getRandomInt(-5, 5);
-                    return {
-                        x: new Date(date).getTime(),
-                        y: baseWeight + trend + noise
-                    };
-                });
-
-                return {
-                    name: ex.name,
-                    data: data,
-                    color: ex.color,
-                    yAxis: 0 // Primary axis (Weight)
-                };
-            });
-
-            // Generate Bodyweight Data (simulating slight fluctuation around 75kg)
-            const bodyweightData = dates.map(date => {
-                const day = parseInt(date.split('-')[2]);
-                const fluctuation = Math.sin(day / 5) * 1.5; // Smooth wave
-                const noise = Math.random() * 0.5;
-                return {
-                    x: new Date(date).getTime(),
-                    y: parseFloat((75 + fluctuation + noise).toFixed(1))
-                };
-            });
-
-            const bodyweightSeries = {
-                name: 'Base Weight', // Updated name as requested
-                data: bodyweightData,
-                color: '#8E8E93', // iOS System Gray
-                dashStyle: 'ShortDash',
-                type: 'line',
-                marker: { enabled: false }, // Cleaner look
-                yAxis: 1 // Secondary axis (Bodyweight)
+            const squatSeries = {
+                name: `Squat (${rmType})`,
+                data: timestamps.map((t, index) => ({
+                    x: t,
+                    y: squatValues[index]
+                })),
+                color: EXERCISES[0].color,
+                yAxis: 0 // 主 Y 軸：重量
             };
 
-            // Calculate Relative Strength (Weight / Bodyweight)
-            const relativeSeries = series.map(s => {
-                const relData = s.data.map((point, index) => {
-                    if (!bodyweightData[index]) return null;
-                    const bw = bodyweightData[index].y;
-                    const ratio = point.y / bw;
+            const benchSeries = {
+                name: `Bench Press (${rmType})`,
+                data: timestamps.map((t, index) => ({
+                    x: t,
+                    y: benchValues[index]
+                })),
+                color: EXERCISES[1].color,
+                type: 'line',
+                marker: { enabled: false },
+                yAxis: 0
+            };
+
+            const bodyweightSeries = {
+                name: 'Body Weight',
+                data: timestamps.map((t, index) => ({
+                    x: t,
+                    y: BODY_WEIGHT_DATA[index]
+                })),
+                color: '#8E8E93', // iOS System Gray
+                type: 'line',
+                marker: { enabled: false },
+                yAxis: 0 // 與 Squat 共用同一個 Y 軸（kg）
+            };
+
+            const bodyFatSeries = {
+                name: 'Body Fat',
+                data: timestamps.map((t, index) => ({
+                    x: t,
+                    y: BODY_FAT_DATA[index]
+                })),
+                color: '#AEAEB2', // iOS System Gray2，與 Body Weight 接近
+                type: 'line',
+                marker: { enabled: false },
+                yAxis: 0 // 同樣以 kg 單位顯示
+            };
+
+            // 體脂率：Body Fat / Body Weight（以百分比顯示）
+            const relativeSeries = [{
+                name: 'Body Fat % (Body Fat / Body Weight)',
+                data: timestamps.map((t, index) => {
+                    const bw = BODY_WEIGHT_DATA[index];
+                    if (!bw) return null;
+                    const fat = BODY_FAT_DATA[index];
+                    const ratio = (fat / bw) * 100;
                     return {
-                        x: point.x,
+                        x: t,
                         y: parseFloat(ratio.toFixed(2))
                     };
-                });
+                }),
+                color: EXERCISES[0].color,
+                type: 'line'
+            }];
 
-                return {
-                    name: s.name + ' (Ratio)',
-                    data: relData,
-                    color: s.color,
-                    type: 'line' // Line chart for ratios is better
-                };
-            });
-
-            const cycleWeeks = getRandomInt(1, 12); // Range increased to test alerts (1-12 weeks)
-
-            // Calculate mini-charts (sparklines) data 
-            // Only return last 7 points for clean UI
-            const sparklines = selectedExercises.map(ex => {
-                // Find the full series data for this exercise
-                const fullSeries = series.find(s => s.name === ex.name);
-                if (fullSeries) {
-                    const trendData = fullSeries.data.slice(-7).map(p => p.y);
-                    // Simple trend calc
-                    const first = trendData[0];
-                    const last = trendData[trendData.length - 1];
-                    const status = last > first ? 'up' : (last < first ? 'down' : 'stable');
-
-                    return {
-                        id: ex.id,
-                        name: ex.name,
-                        icon: ex.icon, // Add icon access
-                        data: trendData,
-                        status: status // up, down, stable
-                    };
+            // Sparklines：顯示所有指標的 4 週趨勢
+            const sparklines = [
+                {
+                    id: 'squat',
+                    name: 'Squat',
+                    icon: EXERCISES[0].icon,
+                    data: squatValues,
+                    status: squatValues[squatValues.length - 1] > squatValues[0]
+                        ? 'up'
+                        : (squatValues[squatValues.length - 1] < squatValues[0] ? 'down' : 'stable')
+                },
+                {
+                    id: 'bench',
+                    name: 'Bench Press',
+                    icon: EXERCISES[1].icon,
+                    data: benchValues,
+                    status: benchValues[benchValues.length - 1] > benchValues[0]
+                        ? 'up'
+                        : (benchValues[benchValues.length - 1] < benchValues[0] ? 'down' : 'stable')
+                },
+                {
+                    id: 'bodyWeight',
+                    name: 'Body Weight',
+                    icon: '⚖️',
+                    data: BODY_WEIGHT_DATA,
+                    status: BODY_WEIGHT_DATA[BODY_WEIGHT_DATA.length - 1] > BODY_WEIGHT_DATA[0]
+                        ? 'up'
+                        : (BODY_WEIGHT_DATA[BODY_WEIGHT_DATA.length - 1] < BODY_WEIGHT_DATA[0] ? 'down' : 'stable')
+                },
+                {
+                    id: 'bodyFat',
+                    name: 'Body Fat',
+                    icon: '📉',
+                    data: BODY_FAT_DATA,
+                    status: BODY_FAT_DATA[BODY_FAT_DATA.length - 1] < BODY_FAT_DATA[0]
+                        ? 'down'
+                        : (BODY_FAT_DATA[BODY_FAT_DATA.length - 1] > BODY_FAT_DATA[0] ? 'up' : 'stable')
                 }
-                return null;
-            }).filter(Boolean); // Filter out nulls
+            ];
+
+            const cycleWeeks = 4; // 固定為 4 週
 
             resolve({
-                series: [...series, bodyweightSeries], // Combine for main chart
-                relativeSeries: relativeSeries, // Separate for new chart
+                series: [squatSeries, benchSeries, bodyweightSeries, bodyFatSeries],
+                relativeSeries,
                 sparklines,
                 cycleWeeks
             });
-        }, 600); // 600ms delay
+        }, 600); // 600ms 延遲
     });
 }
