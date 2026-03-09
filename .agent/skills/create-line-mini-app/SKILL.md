@@ -148,7 +148,11 @@ export const useLiffStore = defineStore('liff', {
 });
 ```
 
-### Step 6: Final Verification
+### Step 6: Design Custom Navigation UI (Critical Constraint)
+**IMPORTANT LINE Mini App Context**: When embedded within LINE, the app runs in a "LIFF Browser" overlay. This environment **removes all native browser navigation toolbars** (like iOS Safari's bottom bar with Back/Forward/Tabs). The only native control provided by LINE is a top Header with a single `<` (Back) button.
+- **Requirement**: You MUST implement a custom in-app navigation system (e.g., a Bottom Tab Bar or an explicit Top Navbar on sub-pages) to prevent users from getting trapped in deep navigation stacks. Relying solely on the native `<` button leads to poor UX.
+
+### Step 7: Final Verification
 - Ensure `src/main.ts` setups Pinia and Router.
 - Create a `.env` file with `VITE_LIFF_ID=YOUR_LIFF_ID`.
 - Run `npm run dev` and verify the page loads with the gradient background.
