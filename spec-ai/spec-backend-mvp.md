@@ -13,32 +13,30 @@
 
 ---
 
-## 2. 前端環境變數與三種儲存模式 (API Client 切換設計)
+## 2. 前端環境變數與雙重儲存模式 (API Client 切換設計)
 
-前端需要實作一個 **Data Service Layer (Repository Pattern)**，根據 `VITE_STORAGE_MODE` 動態切換實作方式：
+前端需要實作一個 **Data Service Layer (Repository Pattern)**，根據 `VITE_STORAGE_MODE` 動態切換實作方式。
+建議在初期開發與測試階段 100% 依賴 `local` 模式，待整合上線時再切換為 `liff` 模式：
 
 ```env
-# 可選值: 'local' | 'remote' | 'liff'
-VITE_STORAGE_MODE='liff'
+# 可選值: 'local' | 'liff'
+VITE_STORAGE_MODE='local'
 
-# 後端 API 基礎路徑 (remote 與 liff 模式使用)
+# 後端 API 基礎路徑 (liff 模式使用)
 VITE_API_BASE_URL='https://api.yourdomain.com'
 ```
 
 ### 實作指南 (AI Agent Reference)
 無論是哪種模式，前端對 Component 暴露的介面皆必須一致（例如： `createTrainingRecord(data)`）。
 
-1. **`local` 模式 (純前端)**：
+1. **`local` 模式 (純前端，開發與離線測試基礎)**：
    - 不發送 HTTP Request。
-   - 實作方式：直接將資料以 JSON 格式序列化後存入 `window.localStorage`。
+   - 實作方式：直接將資料以 JSON 格式序列化後存入瀏覽器的 `window.localStorage`。
 
-2. **`remote` 模式 (純遠端 API，無 LINE 驗證)**：
+2. **`liff` 模式 (遠端 API + LINE Mini App 驗證，正式上線環境)**：
    - 實作方式：使用 `fetch` / `axios` 呼叫 `VITE_API_BASE_URL`。
-   - 驗證方式：前端可自動產生一個 UUID 存放在 localStorage 作為 `deviceId`，並放在 HTTP Request Header (`Authorization: Bearer <deviceId>`)，後端以此區分使用者。
-
-3. **`liff` 模式 (遠端 API + LINE Mini App 驗證)**：
-   - 實作方式：同 `remote`，呼叫 `VITE_API_BASE_URL`。
    - 驗證方式：前端透過 `liff.getIDToken()` 取得 LINE 簽發的 JWT。將其放入 HTTP Header (`Authorization: Bearer <IDToken>`)。後端 API 收到 Request 後，必須先驗證此 Token 的合法性並解析出真實的 LINE `userId`，再進行資料庫存取。
+
 
 ---
 
