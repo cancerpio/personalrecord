@@ -1,0 +1,290 @@
+執行時間：2026-02-11T21:05:00+08:00
+調整功能：training-progress-metrics
+調整類型：調整功能
+備份目錄：./backups/20260211_210500_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- Update.md
+- diff.md
+
+執行時間：2026-02-11T21:15:00+08:00
+調整功能：training-progress-metrics（單一 Y 軸 / 移除 VO2 max & Body Fat）
+調整類型：調整功能
+備份目錄：./backups/20260211_211500_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- src/views/DashboardView.vue
+- Update.md
+- diff.md
+
+執行時間：2026-02-11T21:25:00+08:00
+調整功能：training-progress-metrics（Body Fat 以 kg 顯示）
+調整類型：調整功能
+備份目錄：./backups/20260211_212500_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- Update.md
+- diff.md
+
+執行時間：2026-02-11T21:30:00+08:00
+調整功能：training-progress-metrics（Body Fat 數值微調）
+調整類型：調整功能
+備份目錄：./backups/20260211_213000_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- Update.md
+- diff.md
+
+執行時間：2026-02-11T21:40:00+08:00
+調整功能：training-progress-metrics（Relative Strength → Body Fat %）
+調整類型：調整功能
+備份目錄：./backups/20260211_214000_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- src/views/DashboardView.vue
+- Update.md
+- diff.md
+
+執行時間：2026-02-11T21:45:00+08:00
+調整功能：training-progress-metrics（新增 Bench Press & 調整 RM 排序）
+調整類型：調整功能
+備份目錄：./backups/20260211_214500_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- src/views/DashboardView.vue
+- Update.md
+- diff.md
+
+執行時間：2026-02-11T21:50:00+08:00
+調整功能：training-progress-metrics（配色調整 iOS Style）
+調整類型：調整功能
+備份目錄：./backups/20260211_215000_training-progress-metrics/
+備份檔案清單：
+- src/mock/data.js
+- Update.md
+- diff.md
+
+執行時間：2026-02-08T19:20:00+08:00
+調整功能：line-mini-app-chart
+調整類型：新增功能
+備份目錄：.cursor/backups/20260208_192000_line-mini-app-chart/
+備份檔案清單：
+- README.md
+- .gitignore
+
+完成時間：2026-02-08T19:22:00+08:00
+變更檔案總數：新增 12 個檔案
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:04:30+08:00
+調整功能：line-mini-app-chart
+調整類型：調整功能(Layout Fix)
+備份目錄：.cursor/backups/20260208_192000_line-mini-app-chart/
+備份檔案清單：
+- src/assets/main.css
+- index.html
+
+追加修改時間：2026-02-08T20:04:30+08:00
+追加變更檔案：修正 CSS Safe Area 與 index.html viewport
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:10:20+08:00
+調整功能：cycle-duration-and-mini-charts
+調整類型：新增功能
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/mock/data.js
+- src/components/CycleStatus.vue
+- src/App.vue
+
+
+追加修改時間：2026-02-08T20:10:20+08:00
+追加功能：Cycle Weeks & Sparklines
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:14:50+08:00
+調整功能：ui-refactor-mini-charts
+調整類型：調整功能
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/App.vue
+- src/components/SparklineRow.vue
+- src/components/CycleStatus.vue
+
+追加修改時間：2026-02-08T20:15:00+08:00
+追加功能：UI Refactor (Remove Avatar, Update Sparkline Layout)
+變更記錄位置：Update.md (含 Layout 規範說明)
+執行時間：2026-02-08T20:20:20+08:00
+調整功能：ui-refactor-mini-charts-ux
+調整類型：UI 修正
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/FilterControls.vue
+- src/assets/main.css
+
+追加修改時間：2026-02-08T20:20:20+08:00
+追加功能：Refine Text Contrast and iOS Stying
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:23:00+08:00
+調整功能：fix-ui-flicker-on-refresh
+調整類型：UX 優化
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/App.vue
+
+追加修改時間：2026-02-08T20:23:00+08:00
+追加修正：Fix UI flicker on data refresh
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:25:52+08:00
+調整功能：ui-layout-cycle-status-horizontal
+調整類型：UI 調整
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/CycleStatus.vue
+
+追加修改時間：2026-02-08T20:26:47+08:00
+追加功能：CycleStatus Horizontal Layout
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:32:19+08:00
+調整功能：ui-enhancement-cycle-alerts-icons
+調整類型：UI 增強 (Alerts, Icons, Album Art)
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/CycleStatus.vue
+- src/mock/data.js
+- src/App.vue
+- src/components/FilterControls.vue
+執行時間：2026-02-08T20:33:45+08:00
+調整功能：ui-enhancement-cycle-alerts-icons-final
+調整類型：UI 增強 (Icons, Cycle Alerts)
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/SparklineRow.vue
+
+追加修改時間：2026-02-08T20:33:45+08:00
+追加功能：UI Enhancement (Alerts, Icons, Album Art)
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:42:15+08:00
+調整功能：fix-broken-image-link
+調整類型：Bug 修復
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/CycleStatus.vue
+執行時間：2026-02-08T20:43:30+08:00
+調整功能：ui-enhancement-album-art-local
+調整類型：資源新增與UI調整
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/CycleStatus.vue
+執行時間：2026-02-08T20:46:00+08:00
+調整功能：ui-enhancement-album-art-link-fix
+調整類型：Bug 修復
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/CycleStatus.vue
+
+追加修改時間：2026-02-08T20:46:17+08:00
+追加修正：Switch to local image assets
+變更記錄位置：diff.md
+執行時間：2026-02-08T20:58:36+08:00
+調整功能：ui-enhancement-icon-chart-color-final
+調整類型：UI 調整 (Chart Icon)
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/components/CycleStatus.vue
+
+追加修正時間：2026-02-08T20:58:36+08:00
+追加功能：Revert to Chart Icon (Green/Red)
+變更記錄位置：diff.md
+執行時間：2026-02-08T21:00:59+08:00
+調整功能：cicd-github-actions-setup
+調整類型：新增功能 (CI/CD)
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- .gitignore (以防萬一)
+執行時間：2026-02-08T21:01:36+08:00
+調整功能：cicd-add-base-path
+調整類型：設定調整
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- vite.config.js
+
+追加修正時間：2026-02-08T21:01:36+08:00
+追加功能：GitHub Actions CI/CD setup
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:02:26+08:00
+追加功能：Document CI/CD workflow
+變更記錄位置：diff.md
+執行時間：2026-02-08T21:08:52+08:00
+調整功能：cicd-fix-environment-protection
+調整類型：文件更新 (Troubleshooting)
+備份目錄：N/A (僅更新文件)
+備份檔案清單：N/A
+
+追加修正時間：2026-02-08T21:11:36+08:00
+追加功能：Update README with CI/CD troubleshooting & Live URL
+變更記錄位置：diff.md
+執行時間：2026-02-08T21:34:28+08:00
+調整功能：chart-enhancement-bodyweight
+調整類型：新增功能 (圖表增強)
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/mock/data.js
+- src/App.vue
+- src/components/HistoryChart.vue
+
+追加修正時間：2026-02-08T21:34:52+08:00
+追加功能：Chart Enhancement (Bodyweight & Relative Strength)
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:36:18+08:00
+追加功能：Chart Enhancement (Final Fix)
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:40:09+08:00
+追加功能：Chart Enhancement (Fix + Rename Bodyweight -> Base Weight)
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:41:22+08:00
+追加功能：Chart Enhancement (Fix Filter v-model)
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:42:50+08:00
+追加功能：Update Relative Strength Description
+變更記錄位置：diff.md
+執行時間：2026-02-08T21:44:22+08:00
+調整功能：ui-navigation-tab-implementation
+調整類型：新增功能 (導航與頁面結構)
+備份目錄：./backups/20260208_201020_cycle-duration-and-mini-charts/
+備份檔案清單：
+- src/App.vue
+
+追加修正時間：2026-02-08T21:45:19+08:00
+追加功能：Bottom Navigation Implementation
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:47:41+08:00
+追加功能：Fix App.vue import error
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:50:26+08:00
+追加功能：Refine Navigation Bar & Scrollbar Style
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:52:47+08:00
+追加功能：Simplify App.vue Component Switching
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:55:55+08:00
+追加功能：Debug View Loading
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T21:59:12+08:00
+追加功能：Change Dev Server Port to 5174
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T22:00:54+08:00
+追加功能：Fix App.vue missing import (computed)
+變更記錄位置：diff.md
+
+追加修正時間：2026-02-08T22:03:44+08:00
+追加功能：Rename Dashboard Title (Strength Analytics)
+變更記錄位置：diff.md
