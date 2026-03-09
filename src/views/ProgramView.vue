@@ -1,10 +1,12 @@
 <script setup>
-import { reactive, computed, onMounted, watch } from 'vue';
+import { reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import SearchableDropdown from '../components/SearchableDropdown.vue';
 import { BASE_EXERCISES } from '../constants.js';
+import { useSessionStore } from '../stores/sessionStore.js';
 
 const router = useRouter();
+const sessionStore = useSessionStore();
 
 const form = reactive({
   date: new Date().toISOString().split('T')[0],
@@ -17,59 +19,78 @@ const canSubmit = computed(() => {
   return form.date && form.exercise && form.weight && form.reps;
 });
 
-const savedSessions = reactive([]);
+const savedSessions = computed(() => sessionStore.sessions);
 
-// Load from LocalStorage
+// Load from Store on Mount
 onMounted(() => {
-  const loaded = localStorage.getItem('PR_POC_SESSIONS');
-  if (loaded) {
-    try {
-      const parsed = JSON.parse(loaded);
-      savedSessions.push(...parsed);
-    } catch (e) {
-      console.error('Failed to parse sessions from local storage:', e);
-    }
+  if (sessionStore.sessions.length === 0) {
+    sessionStore.fetchSessions();
   }
 });
 
-// Save to LocalStorage whenever the array changes
-watch(savedSessions, (newVal) => {
-  localStorage.setItem('PR_POC_SESSIONS', JSON.stringify(newVal));
-}, { deep: true });
-
-const submitLog = () => {
+const submitLog = async () => {
   if (!canSubmit.value) return;
   
-  // Save to our Local State array instead of DB
-  savedSessions.push({
-    id: Date.now(),
-    ...form
-  });
+  const newRecord = {
+    date: form.date,
+    exercise: form.exercise,
+    weight: Number(form.weight),
+    reps: Number(form.reps)
+  };
+
+  try {
+    await sessionStore.addSession(newRecord);
+
+    // Provide some visual feedback
+    const btn = document.querySelector('.submit-btn');
+    if (btn) {
+      const originalText = btn.innerText;
+      btn.innerText = 'Saved!';
+      btn.style.background = '#059669'; // darker green
+      
+      setTimeout(() => {
+        btn.innerText = originalText;
+        btn.style.background = ''; // restore
+      }, 1500);
+    }
+  } catch (err) {
+    console.error("Failed to save via store", err);
+    alert('Failed to save your session. Please check your connection.');
+  }
 };
 
 const groupedSessions = computed(() => {
   const groups = {};
   
-  // Group by Date + Exercise
-  savedSessions.forEach(session => {
-    const key = `${session.date}_${session.exercise}`;
-    if (!groups[key]) {
-      groups[key] = {
-        id: key,
-        date: session.date,
-        exercise: session.exercise,
-        sets: []
-      };
-    }
-    groups[key].sets.push({
-      id: session.id,
-      weight: session.weight,
-      reps: session.reps
-    });
-  });
+  // Safely get the sessions array
+  const sessionsArray = Array.isArray(savedSessions.value) ? savedSessions.value : [];
   
-  // Return as sorted array (newest groups first based on first set timestamp or just reverse order)
-  return Object.values(groups).reverse();
+  // Group by Date + Exercise, but ONLY for the currently selected date
+  sessionsArray
+    .filter(session => session && session.date === form.date && session.exercise)
+    .forEach(session => {
+      // Create a normalized Date key
+      const dateKey = session.date;
+      const key = `${dateKey}_${session.exercise}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          id: key,
+          date: dateKey,
+          exercise: session.exercise,
+          sets: []
+        };
+      }
+      
+      groups[key].sets.push({
+        id: session.id || Date.now() + Math.random(),
+        weight: session.weight,
+        reps: session.reps
+      });
+    });
+  
+  // Return as sorted array (newest first based on string comparison of keys)
+  return Object.values(groups).sort((a, b) => b.id.localeCompare(a.id));
 });
 </script>
 

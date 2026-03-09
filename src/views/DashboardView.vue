@@ -1,16 +1,11 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import HistoryChart from '../components/HistoryChart.vue';
 import FilterControls from '../components/FilterControls.vue';
-import CycleStatus from '../components/CycleStatus.vue';
 import SparklineRow from '../components/SparklineRow.vue';
-import { fetchChartData } from '../mock/data';
+import { useSessionStore } from '../stores/sessionStore.js';
 
-// State
-const loading = ref(true);
-const chartSeries = ref([]);
-const sparklines = ref([]);
-const cycleWeeks = ref(1);
+const sessionStore = useSessionStore();
 
 const filters = ref({
   exercise: 'all', 
@@ -19,26 +14,120 @@ const filters = ref({
   month: new Date().getMonth() + 1
 });
 
-const loadChartData = async (currentFilters) => {
-  loading.value = true;
-  try {
-    const { series, sparklines: sl, cycleWeeks: cw } = await fetchChartData(currentFilters);
-    chartSeries.value = series;
-    sparklines.value = sl;
-    cycleWeeks.value = cw;
-  } catch (error) {
-    console.error('Failed to load chart data:', error);
-  } finally {
-    loading.value = false;
-  }
-};
+// Computed properties reading directly from the Pinia Store
+const loading = computed(() => sessionStore.isLoading);
 
-watch(filters, (newVal) => {
-  loadChartData(newVal);
-}, { deep: true });
+// Get a unique list of all exercises the user has actively tracked
+const uniqueExercises = computed(() => {
+  const exSet = new Set(sessionStore.sessions.map(s => s.exercise));
+  return Array.from(exSet).sort();
+});
+
+// Highcharts Series array
+const chartSeries = computed(() => {
+  // If "all" (default) is selected, fallback to the first exercise they've tracked
+  const firstAvailable = uniqueExercises.value.length > 0 ? uniqueExercises.value[0] : 'Squat';
+  const selectedEx = filters.value.exercise === 'all' ? firstAvailable : filters.value.exercise;
+  
+  // Primary Axis (Index 0) - Weight
+  const weightData = sessionStore.getChartSeriesForExercise(selectedEx);
+  
+  // Secondary Axis (Index 1) - Body Fat (Mock placeholder for MVP, could use another store later)
+  // Generating a flat mock line matching the datetimes of the real weightData if it exists
+  const bodyFatData = weightData.map(point => {
+    // Drop by 0.1% per day roughly
+    const offset = Math.random() * 0.5 - 0.25; 
+    return [point[0], 15.5 + offset];
+  });
+
+  return [
+    {
+      name: `${selectedEx} (${filters.value.rmType})`,
+      type: 'spline',
+      color: '#10b981', // Emerald Primary
+      data: weightData,
+      yAxis: 0,
+      marker: { enabled: true, radius: 4 }
+    },
+    {
+      name: 'Body Fat %',
+      type: 'spline',
+      color: '#fb923c', // Orange Warn
+      data: bodyFatData.length > 0 ? bodyFatData : [[Date.now(), 15.5]],
+      yAxis: 1,
+      dashStyle: 'ShortDash',
+      marker: { enabled: false }
+    }
+  ]
+});
+
+// Sparklines array for the top header
+const sparklines = computed(() => {
+  // We only show up to 3 sparklines on the dashboard to keep it clean (MVP Apple HIG)
+  const topExercises = uniqueExercises.value.slice(0, 3);
+  
+  if (topExercises.length === 0) return [];
+
+  return topExercises.map(ex => {
+    const data = sessionStore.getChartSeriesForExercise(ex);
+    const yValues = data.map(d => d[1]);
+    
+    // Default values for short data
+    let trend = 'none';
+    let label = '—';
+    
+    if (yValues.length >= 2) {
+      // Determine the current trend direction based on the last two points
+      const lastPoint = yValues[yValues.length - 1];
+      const prevPoint = yValues[yValues.length - 2];
+      
+      let currentTrendDirection = 'same';
+      if (lastPoint > prevPoint) currentTrendDirection = 'up';
+      if (lastPoint < prevPoint) currentTrendDirection = 'down';
+
+      // Count consecutive days of this trend
+      let streakCount = 1; // Including the last point
+      for (let i = yValues.length - 2; i >= 0; i--) {
+        const p1 = yValues[i + 1];
+        const p0 = yValues[i];
+        
+        let pointTrend = 'same';
+        if (p1 > p0) pointTrend = 'up';
+        if (p1 < p0) pointTrend = 'down';
+
+        if (pointTrend === currentTrendDirection) {
+          streakCount++;
+        } else {
+          break; // Streak broken
+        }
+      }
+
+      trend = currentTrendDirection;
+      
+      if (trend === 'up') {
+        label = `連續 ${streakCount} 天上升`;
+      } else if (trend === 'down') {
+        label = `連續 ${streakCount} 天下降`;
+      } else {
+        label = `連續 ${streakCount} 天停滯`;
+      }
+    }
+
+    return {
+      id: ex.toLowerCase().replace(' ', '-'),
+      label: ex,
+      value: yValues.length > 0 ? `${yValues[yValues.length - 1]}kg` : '—',
+      trend: trend,
+      statusLabel: label,
+      data: yValues
+    };
+  });
+});
 
 onMounted(() => {
-  loadChartData(filters.value);
+  if (sessionStore.sessions.length === 0) {
+    sessionStore.fetchSessions();
+  }
 });
 </script>
 
@@ -51,9 +140,6 @@ onMounted(() => {
         <h1>Strength and Conditioning Analytics</h1>
       </div>
     </div>
-
-    <!-- Cycle Status -->
-    <CycleStatus :status="'Linear'" :weeks="cycleWeeks" />
 
     <!-- Sparklines (Performance Trends) -->
     <div class="sparklines-container" :class="{ refreshing: loading }">
@@ -76,7 +162,7 @@ onMounted(() => {
     </div>
 
     <!-- Filters -->
-    <FilterControls v-model:filters="filters" />
+    <FilterControls v-model:filters="filters" :availableExercises="uniqueExercises" />
   </div>
 </template>
 
