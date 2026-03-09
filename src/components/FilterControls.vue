@@ -1,8 +1,12 @@
 <script setup>
-import { EXERCISES, RM_TYPES } from '../mock/data';
+import { RM_TYPES } from '../mock/data';
 
 const props = defineProps({
-  filters: Object
+  filters: Object,
+  availableExercises: {
+    type: Array,
+    default: () => []
+  }
 });
 
 const emit = defineEmits(['update:filters']);
@@ -38,9 +42,9 @@ function update(key, value) {
         @change="e => update('exercise', e.target.value)"
         class="glass-input"
       >
-        <option value="all">All Exercises</option>
-        <option v-for="ex in EXERCISES" :key="ex.id" :value="ex.id">
-          {{ ex.name }}
+        <option value="all">First Available Exercise</option>
+        <option v-for="ex in availableExercises" :key="ex" :value="ex">
+          {{ ex }}
         </option>
       </select>
     </div>

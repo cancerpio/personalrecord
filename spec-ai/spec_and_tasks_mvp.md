@@ -12,6 +12,7 @@
 ### 1.2 前端技術棧與 UI 規範
 *   **Framework**: Vue 3 + Vite + TypeScript (基於 `create-line-mini-app` Agent Skill 初始化)。
 *   **Routing**: `vue-router`。
+*   **State Management**: `pinia` (作為 Single Source of Truth，串接 API Factory 與 UI 元件)。
 *   **Styling**: Vanilla CSS (Liquid Glass UI System, `#10b981` Emerald 主色調)。
 *   **Charts**: Highcharts (支援雙 Y 軸、時間軸縮放與拖曳)。
 *   **Apple HIG 規範落實**: 
@@ -29,10 +30,11 @@
 ## 2. 功能實作藍圖 (Implementation Playbooks)
 
 ### Feature 1: 首頁視覺化儀表板 (Dashboard)
-*   **User Behavior**: 使用者進入首頁，上方看到多個動作與體重/體脂的微型趨勢圖 (Sparklines)。下方有一個大型 Hero Chart，預設疊加顯示「訓練重量 (左軸 KG)」與「體脂率 (右軸橘色 %%)」。可透過選單切換要檢視的動作。
+*   **User Behavior**: 使用者進入首頁，上方看到多個動作的微型狀態膠囊 (Sparkline Pills)。下方有一個大型 Hero Chart，預設疊加顯示「訓練重量 (左軸 KG)」與「體脂率 (右軸橘色 %%)」。可透過選單切換要檢視的動作。
 *   **Frontend Implementation**: 
     - 修改 `DashboardView.vue` 納入 `HistoryChart.vue` (雙 Y 軸設定)。
-    - 確保 Y 軸單位標示與色彩對應。
+    - **動態選項 (Dynamic Loading)**: `FilterControls` 與 `Sparklines` 的清單不再 Hardcode，改由分析 Pinia 取得 `uniqueExercises` 動態陣列。
+    - **連莊分析 (Streak)**: `DashboardView` 內部實作向後追朔之連續天數演算法，提供 `SparklineRow` 渲染進退步文字。
 *   **Data Structure**: 需聚合 `TrainingRecord` (過濾出 RM 最高值) 與 `BodyMetricsRecord` 轉換為 Highcharts 的 `[timestamp, value]` 陣列。
 *   **Technical Constraints**: 雙 Y 軸的刻度範圍跳動不能過於劇烈，否則會影響視覺連動性。
 *   **AI Execution Tasks**:
@@ -61,21 +63,22 @@
     - [ ] Task 3.1: 實作 Router 架構與基礎頁面 (Dashboard, Log, Settings)。
     - [ ] Task 3.2: 實作 `BottomTabBar` UI 元件並加入 Safe Area padding。
 
-### Feature 4: 資料儲存服務層 (Data Service Layer)
-*   **User Behavior**: 使用者對 App 的儲存位置感到無縫，系統依據環境變數切換。
+### Feature 4: 統一資料服務層與 Pinia 串接 (Unified Data Layer)
+*   **User Behavior**: 使用者對 App 的儲存位置感到無縫，系統依據環境變數切換，且圖表能即時反應 Program 頁面輸入的新紀錄。
 *   **Frontend Implementation**:
-    - 建立 `src/services/api.js` (或 `.ts`)，它是一個 Factory，統一對外提供 `fetchChartData()`, `getTrainingRecords()` 等方法。
-    - 建立 `LocalService`: 直接操作 `window.localStorage`。
-    - 建立 `LIFFService`: 負責組裝 HTTP Request (Axios / Fetch) 並帶入 LINE 的身分驗證。
-*   **Technical Details for Initialization (VITE_STORAGE_MODE)**:
-    - `local`: Factory 回傳 `LocalService`。
-    - `liff`: Factory 先等待 `liff.init()` 完成，透過 `liff.getIDToken()` 取得 JWT。接著把 JWT 放入 `LIFFService` 發送 API Request 的 Header 裡。若 Token 過期，需有攔截器負責更新。
+    - 建立 `src/services/api.js` (Repository Pattern Factory)，統一對外提供 `getSessions()`, `addSession()` 等方法。
+    - 依據環境變數 `VITE_STORAGE_MODE` 切換 `LocalService` (使用 localStorage) 或 `LIFFService` (使用 Axios + LINE JWT)。
+    - **重點架構 (Store)**: 引入 `pinia` 建立 `sessionStore.js`。由 Store 統一呼叫 API，並將生資料轉換為 Highcharts 繪圖所需的格式 (透過 getters)。
+*   **Data Structure**: 統一 Record Schema：
+  ```json
+  { "id": "uuid", "date": "YYYY-MM-DD", "exercise": "String", "weight": Number, "reps": Number, "createdAt": Timestamp }
+  ```
 *   **Technical Constraints**: 
-    - 兩種實體類別必須實作一模一樣的介面 (Interface)，確保 UI 層 (Component) 不需要寫任何 IF/ELSE 判斷邏輯。
-    - 需考量 API 的 Error Handling (例如網路斷線時，給予友善提示)。
+    - 兩種 Storage Service 必須實作一模一樣的 Interface。
+    - UI 層 (`DashboardView`, `ProgramView`) 嚴禁直接呼叫 API 或 localStorage，所有資料存取皆需經過 `sessionStore`。
 *   **AI Execution Tasks**:
-    - [ ] Task 4.1: 定義統一的 Data Source Interface (或 JSDoc 方法規範)。
-    - [ ] Task 4.2: 實作 `LocalService` (將 Mock JSON 改寫進 localStorage 讀取)。
-    - [ ] Task 4.3: 實作 `LIFFService` (處理 liff.init 與 JWT Headers 附加邏輯)。
-    - [ ] Task 4.4: 實作 `api.ts` Factory 根據 `.env` 產出對應的 Service Instance。
-    - [ ] Task 4.5: 重構原有的 Component (如 `DashboardView`)，改用新的 API Service。
+    - [ ] Task 4.1: 建立統一的 Record Schema 與 `.env` 設定。
+    - [ ] Task 4.2: 實作 `api.js` (Repository Factory) 與 `LocalService` 底層實作。
+    - [ ] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
+    - [ ] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
+    - [ ] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
