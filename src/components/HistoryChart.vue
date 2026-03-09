@@ -47,15 +47,18 @@ const chartOptions = computed(() => ({
     { // Primary Axis (Left - Weight)
       title: { text: null },
       gridLineColor: 'rgba(255,255,255,0.05)',
-      labels: { style: { color: '#8E8E93' } }
+      labels: { 
+        style: { color: '#8E8E93' },
+        format: '{value} KG'
+      }
     },
-    { // Secondary Axis (Right - Bodyweight)
+    { // Secondary Axis (Right - Body Fat/Percentage)
       title: { text: null },
       opposite: true,
       gridLineWidth: 0,
       labels: { 
-        style: { color: '#8E8E93' },
-        format: '{value} kg'
+        style: { color: '#FF9500', fontWeight: 'bold' },
+        format: '{value}%'
       }
     }
   ] : { // Single Axis

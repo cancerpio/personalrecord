@@ -91,9 +91,9 @@ export async function fetchChartData({ exercise, rmType, year, month }) {
                 yAxis: 0 // 同樣以 kg 單位顯示
             };
 
-            // 體脂率：Body Fat / Body Weight（以百分比顯示）
-            const relativeSeries = [{
-                name: 'Body Fat % (Body Fat / Body Weight)',
+            // 體脂率 (Body Fat Percentage) 移至副 Y 軸 (yAxis: 1)
+            const bodyFatPercentSeries = {
+                name: 'Body Fat %',
                 data: timestamps.map((t, index) => {
                     const bw = BODY_WEIGHT_DATA[index];
                     if (!bw) return null;
@@ -101,12 +101,28 @@ export async function fetchChartData({ exercise, rmType, year, month }) {
                     const ratio = (fat / bw) * 100;
                     return {
                         x: t,
-                        y: parseFloat(ratio.toFixed(2))
+                        y: parseFloat(ratio.toFixed(1))
                     };
                 }),
-                color: EXERCISES[0].color,
-                type: 'line'
-            }];
+                color: '#FF9500', // iOS System Orange for distinct contrast
+                type: 'spline',
+                dashStyle: 'ShortDot',
+                marker: { enabled: true, symbol: 'circle', radius: 4 },
+                yAxis: 1 // 對應副 Y 軸 (%)
+            };
+
+            // 根據 filter 篩選出要顯示的主圖表線條
+            let activeSeries = [];
+            if (exercise === 'squat') {
+                activeSeries.push(squatSeries);
+            } else if (exercise === 'bench') {
+                activeSeries.push(benchSeries);
+            } else {
+                // default/all shows both
+                activeSeries.push(squatSeries, benchSeries);
+            }
+
+            activeSeries.push(bodyFatPercentSeries);
 
             // Sparklines：顯示所有指標的 4 週趨勢
             const sparklines = [
@@ -151,8 +167,7 @@ export async function fetchChartData({ exercise, rmType, year, month }) {
             const cycleWeeks = 4; // 固定為 4 週
 
             resolve({
-                series: [squatSeries, benchSeries, bodyweightSeries, bodyFatSeries],
-                relativeSeries,
+                series: activeSeries,
                 sparklines,
                 cycleWeeks
             });

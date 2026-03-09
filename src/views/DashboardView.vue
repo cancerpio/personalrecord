@@ -9,7 +9,6 @@ import { fetchChartData } from '../mock/data';
 // State
 const loading = ref(true);
 const chartSeries = ref([]);
-const relativeStrengthSeries = ref([]);
 const sparklines = ref([]);
 const cycleWeeks = ref(1);
 
@@ -23,9 +22,8 @@ const filters = ref({
 const loadChartData = async (currentFilters) => {
   loading.value = true;
   try {
-    const { series, relativeSeries, sparklines: sl, cycleWeeks: cw } = await fetchChartData(currentFilters);
+    const { series, sparklines: sl, cycleWeeks: cw } = await fetchChartData(currentFilters);
     chartSeries.value = series;
-    relativeStrengthSeries.value = relativeSeries;
     sparklines.value = sl;
     cycleWeeks.value = cw;
   } catch (error) {
@@ -70,21 +68,10 @@ onMounted(() => {
     <div class="chart-section" :class="{ loading: loading }">
       <div class="section-header">
         <h2>Performance Overview</h2>
-        <p class="section-desc">動作重量 vs 體重趨勢（單位：kg）。</p>
+        <p class="section-desc">左軸代表訓練重量 (KG)，右側虛線代表體脂率 (%)，協助分析體態變化對力量的影響。</p>
       </div>
       <div class="chart-container glass-panel">
-        <HistoryChart :series="chartSeries" />
-      </div>
-    </div>
-
-    <!-- Chart Section 2: Body Fat Percentage -->
-    <div class="chart-section" :class="{ loading: loading }">
-      <div class="section-header">
-        <h2>Body Fat Percentage</h2>
-        <p class="section-desc">體脂率 (Body Fat / Body Weight)。</p>
-      </div>
-      <div class="chart-container glass-panel">
-        <HistoryChart :series="relativeStrengthSeries" :dualAxis="false" yAxisLabel="Body Fat %" />
+        <HistoryChart :series="chartSeries" :dualAxis="true" />
       </div>
     </div>
 
