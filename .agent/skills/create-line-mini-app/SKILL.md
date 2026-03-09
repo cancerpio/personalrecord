@@ -149,8 +149,12 @@ export const useLiffStore = defineStore('liff', {
 ```
 
 ### Step 6: Design Custom Navigation UI (Critical Constraint)
-**IMPORTANT LINE Mini App Context**: When embedded within LINE, the app runs in a "LIFF Browser" overlay. This environment **removes all native browser navigation toolbars** (like iOS Safari's bottom bar with Back/Forward/Tabs). The only native control provided by LINE is a top Header with a single `<` (Back) button.
-- **Requirement**: You MUST implement a custom in-app navigation system (e.g., a Bottom Tab Bar or an explicit Top Navbar on sub-pages) to prevent users from getting trapped in deep navigation stacks. Relying solely on the native `<` button leads to poor UX.
+**IMPORTANT LINE Mini App Context**: When embedded within LINE, the app runs in a "LIFF Browser" overlay. This environment **removes all native browser navigation toolbars** (like iOS Safari's bottom bar with Back/Forward/Tabs). The only native control provided by LINE is a top Header that usually contains a close or share button.
+- **Problem: Double Header**: If you build a persistent Top Navbar in your Web App for typical SPA navigation, it will stack directly under the LINE native Header, creating a bulky "Double Header" that wastes vertical screen space and looks unprofessional.
+- **Solution (Plan B Architecture)**: Implement a dynamic navigation system:
+  1.  **Bottom Tab Bar**: Use this for top-level root navigation (e.g., Home, Search, Profile).
+  2.  **Dynamic Top Navbar**: Create a custom Top Navbar with a `< Back` button, but **ONLY render it on deep sub-pages** (e.g., `v-if="!isRootPage"`). On root pages, hide it completely so the content sits flush under the LINE native Header.
+  3.  **Vue Router History Edge-Case**: When the user clicks `< Back`, use `router.back()`. However, beware of direct deep-linking or page refreshes on sub-pages where `window.history.length === 1`. In those cases, provide a fallback (e.g., `router.push('/')`) to prevent the user from getting trapped.
 
 ### Step 7: Final Verification
 - Ensure `src/main.ts` setups Pinia and Router.
