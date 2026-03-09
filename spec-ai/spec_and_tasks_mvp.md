@@ -82,3 +82,14 @@
     - [ ] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
     - [ ] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
     - [ ] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
+
+### Feature 5: Program View UI/UX Enhancement (iOS 16 Liquid Glass)
+*   **User Behavior**: 使用者在記錄新訓練時，享有更大、更清晰、更現代的輸入體驗。點擊數字欄位時，自動彈出專屬的大型九宮格數字鍵盤。
+*   **Frontend Implementation**:
+    - **UI Style**: 採用 iOS 16 Settings App 風格的「Grouped List (清單群組)」排版。標題與欄位水平置放，搭配透明毛玻璃卡片底色與細緻分隔線。
+    - **Input UX**: 數字輸入框屬性改為 `inputmode="decimal"` 以支援九宮格鍵盤。使用 CSS `::-webkit-inner-spin-button` 徹底隱藏預設的上下箭頭。
+*   **Technical Constraints**: `inputmode="decimal"` 行為依賴 OS 虛擬鍵盤支援，但目前為 iOS/Android 雙平台標準。
+*   **AI Execution Tasks**:
+    - [x] (已完成) 調整 `ProgramView.vue` 佈局為 iOS 16 Grouped List。
+    - [x] (已完成) 調整 `SearchableDropdown.vue` 樣式以適應新佈局 (右靠齊、去背)。
+    - [x] (已完成) 隱藏 HTML 原生數字箭頭並實作 `inputmode="decimal"` 行為。
