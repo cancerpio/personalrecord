@@ -5,12 +5,12 @@
   <div class="view-container">
     <div class="header-section">
       <div class="title-area">
-        <label class="welcome">Input</label>
-        <h1>Training Log</h1>
+        <label class="welcome">History</label>
+        <h1>Training Logs</h1>
       </div>
     </div>
     <div class="placeholder-content glass-card">
-      <p>Log your daily training sessions and track your progress.</p>
+      <p>Your past training sessions will be displayed here.</p>
       <p class="coming-soon">Coming Soon...</p>
     </div>
   </div>
