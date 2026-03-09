@@ -74,13 +74,19 @@ const chartSeries = computed(() => {
 
 // Sparklines array for the top header
 const sparklines = computed(() => {
+  // Force Vue reactivity to register these dependencies before mapping
+  const currentRmType = filters.value.rmType;
+  const currentYear = filters.value.year;
+  const currentMonth = filters.value.month;
+  
   // We only show up to 3 sparklines on the dashboard to keep it clean (MVP Apple HIG)
   const topExercises = uniqueExercises.value.slice(0, 3);
   
   if (topExercises.length === 0) return [];
 
   return topExercises.map(ex => {
-    const data = sessionStore.getChartSeriesForExercise(ex, filters.value.rmType, filters.value.year, filters.value.month);
+    // Pass the destructured reactive values, not filters.value.*
+    const data = sessionStore.getChartSeriesForExercise(ex, currentRmType, currentYear, currentMonth);
     const yValues = data.map(d => d[1]);
     
     // Default values for short data

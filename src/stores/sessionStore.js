@@ -25,13 +25,14 @@ export const useSessionStore = defineStore('session', {
                 filtered = filtered.filter(s => parseInt(s.date.split('-')[1]) === month);
             }
 
-            // Map 'PR', '1RM' to 1 reps, '3RM' to 3 reps, '5RM' to 5 reps
-            let minReps = 1;
-            if (calculationType === '3RM') minReps = 3;
-            else if (calculationType === '5RM') minReps = 5;
+            // Map 'PR' to exactly 1 rep, '3RM' to exactly 3 reps, '5RM' to exactly 5 reps
+            // Users want strict classification, not "at least X reps"
+            let targetReps = 1;
+            if (calculationType === '3RM') targetReps = 3;
+            else if (calculationType === '5RM') targetReps = 5;
 
-            // Filter out sets that don't meet the rep requirement
-            const repFiltered = filtered.filter(s => s.reps >= minReps);
+            // Filter out sets that don't match the EXACT rep requirement
+            const repFiltered = filtered.filter(s => s.reps === targetReps);
 
             // Group by date to find max per day
             const groupedByDate = {};

@@ -173,6 +173,9 @@ const addNewOption = () => {
 .searchable-dropdown {
   position: relative;
   width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .input-wrapper {
