@@ -103,55 +103,46 @@ const groupedSessions = computed(() => {
       </div>
     </div>
     
-    <div class="glass-card form-container">
-      <h3>New Session (PoC)</h3>
-      
-      <div class="form-group">
+    <!-- iOS 16 Grouped List Form -->
+    <div class="ios-list-group glass-card">
+      <div class="ios-list-item">
         <label>Date</label>
-        <input type="date" class="glass-input" v-model="form.date" />
+        <input type="date" class="ios-input" v-model="form.date" />
       </div>
 
-      <div class="form-group">
+      <div class="ios-list-item">
         <label>Exercise</label>
-        <SearchableDropdown 
-          v-model="form.exercise" 
-          :options="BASE_EXERCISES" 
-          placeholder="Search or add exercise..."
-        />
-      </div>
-
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Weight (KG)</label>
-          <input type="number" class="glass-input" v-model="form.weight" placeholder="e.g. 100" />
-        </div>
-        <div class="form-group half">
-          <label>Reps</label>
-          <input type="number" class="glass-input" v-model="form.reps" placeholder="e.g. 5" />
+        <div class="ios-input-wrapper">
+          <SearchableDropdown 
+            v-model="form.exercise" 
+            :options="BASE_EXERCISES" 
+            placeholder="Select..."
+          />
         </div>
       </div>
-
-      <div class="preview-box">
-        <h4>Current Input State:</h4>
-        <p><strong>Exercise:</strong> {{ form.exercise || 'None selected' }}</p>
-        <div class="debug-badges">
-          <span v-if="BASE_EXERCISES.includes(form.exercise)" class="badge internal">Built-in</span>
-          <span v-else-if="form.exercise" class="badge custom">Custom Saved</span>
-        </div>
+      
+      <div class="ios-list-item">
+        <label>Weight <span class="unit">(KG)</span></label>
+        <input type="number" inputmode="decimal" class="ios-input num-input" v-model="form.weight" placeholder="0" />
       </div>
 
-      <button 
-        class="submit-btn" 
-        :disabled="!canSubmit"
-        @click="submitLog"
-      >
-        Save Session
-      </button>
+      <div class="ios-list-item">
+        <label>Reps</label>
+        <input type="number" inputmode="decimal" class="ios-input num-input" v-model="form.reps" placeholder="0" />
+      </div>
     </div>
 
-    <div v-if="savedSessions.length > 0" class="glass-card history-container">
-      <h3>Saved Sessions</h3>
-      <div class="session-list">
+    <button 
+      class="submit-btn" 
+      :disabled="!canSubmit"
+      @click="submitLog"
+    >
+      Save Session
+    </button>
+
+    <div v-if="savedSessions.length > 0" class="history-section">
+      <h3 class="section-title">Saved Sessions</h3>
+      <div class="ios-list-group glass-card session-list">
         <div v-for="group in groupedSessions" :key="group.id" class="session-card" @click="router.push('/program/session')">
           <div class="session-header">
             <span class="exercise-name">{{ group.exercise }}</span>
@@ -203,79 +194,117 @@ const groupedSessions = computed(() => {
   margin-bottom: 4px;
 }
 
-.form-container {
-  padding: 24px;
+/* iOS 16 Grouped List Styling */
+.ios-list-group {
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow: hidden; /* Contains inner borders */
 }
 
-h3 {
-  margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 20px;
-  color: #1f2937;
-}
-
-.form-group {
+.ios-list-item {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-row {
-  display: flex;
-  gap: 16px;
-}
-
-.half {
-  flex: 1;
-}
-
-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5563;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-input[type="date"], input[type="number"] {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.preview-box {
-  margin-top: 16px;
+  align-items: center;
+  justify-content: space-between;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.preview-box h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: #6b7280;
+.ios-list-item:last-child {
+  border-bottom: none;
 }
 
-.preview-box p {
-  margin: 0;
+.ios-list-item label {
   font-size: 16px;
-  color: #111827;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  width: 100px; /* Fixed width for alignment */
 }
 
-.debug-badges {
-  margin-top: 8px;
-  min-height: 24px;
+.unit {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
-.badge {
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 12px;
+.ios-input-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ios-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 18px;
   font-weight: 600;
+  color: #10b981; /* Emerald for inputs */
+  text-align: right;
+  padding: 0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none; /* remove native styling */
+}
+
+.ios-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+input.num-input {
+  font-size: 24px;
+}
+
+/* Kills the ugly HTML number spinner arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+/* Submit Button */
+.submit-btn {
+  margin-top: 8px;
+  padding: 18px;
+  background: var(--color-primary, #10b981);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  width: 100%;
+}
+
+.submit-btn:disabled {
+  background: rgba(118, 118, 128, 0.24);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
   text-transform: uppercase;
+  padding-left: 16px;
+  margin: 0;
 }
 
 .badge.internal {
@@ -288,40 +317,38 @@ input[type="date"], input[type="number"] {
   color: #047857;
 }
 
-.history-container {
-  padding: 24px;
-}
-
 .session-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  padding: 0;
 }
 
 .session-card {
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 12px;
-  padding: 12px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 16px;
   cursor: pointer;
   transition: background 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.session-card:last-child {
+  border-bottom: none;
 }
 
 .session-card:active {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .session-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .exercise-name {
   font-weight: 700;
-  font-size: 16px;
-  color: #111827;
+  font-size: 18px;
+  color: var(--text-primary);
 }
 
 .session-date {
@@ -360,31 +387,5 @@ input[type="date"], input[type="number"] {
   color: var(--text-primary, #e4e4e7);
 }
 
-.submit-btn {
-  margin-top: 8px;
-  padding: 16px;
-  background: var(--color-primary, #10b981);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
 
-.submit-btn:disabled {
-  background: #d1d5db;
-  color: #9ca3af;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.submit-btn:not(:disabled):active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
-}
 </style>

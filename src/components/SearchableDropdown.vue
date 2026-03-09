@@ -122,7 +122,7 @@ const addNewOption = () => {
       <input 
         ref="inputRef"
         type="text" 
-        class="glass-input dropdown-input"
+        class="dropdown-input"
         :value="internalSearchQuery"
         :placeholder="isOpen ? 'Search...' : (modelValue || placeholder)"
         @input="handleInput"
@@ -184,10 +184,20 @@ const addNewOption = () => {
   width: 100%;
   padding-right: 32px; /* space for icon */
   box-sizing: border-box;
-  font-size: 16px;
+  font-size: 18px; /* Bigger font for iOS look */
+  font-weight: 600;
+  color: #10b981; /* Emerald text, matches right-aligned inputs */
+  text-align: right;
   cursor: text;
   background-color: transparent;
-  color: var(--text-primary, #ffffff); 
+  border: none;
+  outline: none;
+  appearance: none;
+}
+
+.dropdown-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  font-weight: 500;
 }
 
 .dropdown-icon {
