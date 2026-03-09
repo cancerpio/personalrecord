@@ -46,7 +46,7 @@
 * ~~**[使用者提出] 首頁追蹤圖表 UI 優化**：目前前端已有表現追蹤圖表的初步實作，需檢視並討論如何調整才能更簡約、更貼近 Apple Human Interface Guidelines 規範。~~ (已確認：採用單一 Hero Section 大圖表)
 * ~~**[使用者提出] 「自訂追蹤體脂率」功能入口與呈現**：讓使用者決定是否顯示體脂率的設定或開關，該擺在哪一頁？UI 該如何設計以符合 Apple Human Interface Guidelines？~~ (已確認：轉為 Hero Chart 的疊加開關)
 * ~~**[使用者與AI共同提出] 體脂率圖表合併評估確認**：既然 Performance Overview 其實已將訓練表現與體脂趨勢放在同一張圖表內，是否還需要將「Body Fat Percentage 圖表」獨立成另一個專屬顯示區塊？~~ (已確認：廢除獨立區塊，採用雙 Y 軸合體呈現)
-* **[使用者提出] LINE Mini App 導覽列 (Navigation) 限制**：當作為 LINE Mini App 運行時，會失去原生瀏覽器的 Navbar (上一頁/下一頁)。UI 該如何設計補足導覽功能（例如：Bottom Tab Bar 或自製 Top Navbar），以確保使用者不會迷失或操作卡死？
+* ~~**[使用者提出] LINE Mini App 導覽列 (Navigation) 限制**：當作為 LINE Mini App 運行時，會失去原生瀏覽器的 Navbar (上一頁/下一頁)。UI 該如何設計補足導覽功能（例如：Bottom Tab Bar 或自製 Top Navbar），以確保使用者不會迷失或操作卡死？~~ (已確認：採用 Bottom Tab Bar 作為主切換，並搭配「僅在子頁面顯示」的動態 Top Navbar 返回鍵，以避免與 LINE 原生 Header 造成雙重疊加)
 
 ---
 
@@ -61,3 +61,4 @@
 | `2026-03-09 12:09` | **使用者提問**：<br>指出單一圖表的設計目前僅為「試作 (PoC)」，尚未最後 Confirm (需等待實作與試用後決定)。 | **AI 結論**：<br>已於 Spec 復原 Need to Confirm 的未解決狀態，並加上「目前試作方案 (PoC)」的備註。待試作版完成且使用者確認好用後，再正式結案。 |
 | `2026-03-09 12:27` | **使用者提問**：<br>試用 PoC 後，確認雙 Y 軸疊合的概念有用，指示將此方案標記為正式接受。同時提出三個 UI 強化需求：<br>1. 右 Y 軸標註對應色塊。<br>2. 左 Y 軸需加上明確單位 (KG)。<br>3. 需有地方 (如副標題) 說明雙 Y 軸代表的意義。 | **AI 結論**：<br>已於本文件中正式 Confirm 四項相關的研發議程。並將上述三點細部優化，轉化為 `implementation_plan.md` 的 Action Item。 |
 | `2026-03-09 15:10` | **使用者提問**：<br>提出 LINE Mini App 的導覽介面限制問題：當在 Mini App 內運行時，會失去原生瀏覽器導覽列，該如何將導覽功能放上 Web App？ | **AI 結論**：<br>確認此限制為真。建議採用 Bottom Tab Bar 與自製 Top Navbar 解決。已將此 UI 導覽架構議題放入 Need to Confirm 等待決策，為日後轉化為 `spec_and_tasks_mvp.md` SDD 先行準備。 |
+| `2026-03-09 18:00` | **使用者提問**：<br>確認 LINE Mini App 的導覽架構，為避免 Web App 的 Top Navbar 與 LINE 原生 Header 造成雙重疊加 (Double Header) 問題，決定採用方案 B。 | **AI 結論**：<br>已於 Spec 確認採用「方案 B：動態隱藏 TopNavbar」。主頁面完全隱藏頂部導航列以保持畫面乾淨，僅在進入子頁面時顯示帶有 `< Back` 的 Top Navbar。此架構亦同步更新至 Agent Skill 中供跨專案使用。 |

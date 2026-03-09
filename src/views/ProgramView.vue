@@ -1,7 +1,10 @@
 <script setup>
 import { reactive, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import SearchableDropdown from '../components/SearchableDropdown.vue';
 import { BASE_EXERCISES } from '../constants.js';
+
+const router = useRouter();
 
 const form = reactive({
   date: new Date().toISOString().split('T')[0],
@@ -128,7 +131,7 @@ const groupedSessions = computed(() => {
     <div v-if="savedSessions.length > 0" class="glass-card history-container">
       <h3>Saved Sessions</h3>
       <div class="session-list">
-        <div v-for="group in groupedSessions" :key="group.id" class="session-card">
+        <div v-for="group in groupedSessions" :key="group.id" class="session-card" @click="router.push('/program/session')">
           <div class="session-header">
             <span class="exercise-name">{{ group.exercise }}</span>
             <span class="session-date">{{ group.date }}</span>
@@ -279,6 +282,12 @@ input[type="date"], input[type="number"] {
   border-radius: 12px;
   padding: 12px 16px;
   border: 1px solid rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.session-card:active {
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .session-header {

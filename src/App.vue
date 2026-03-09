@@ -1,48 +1,47 @@
 <script setup>
-import { ref, computed } from 'vue';
-// View Imports
-import DashboardView from './views/DashboardView.vue';
-import ProgramView from './views/ProgramView.vue';
-import LogView from './views/LogView.vue';
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import TopNavbar from './components/TopNavbar.vue';
 
-const currentTab = ref('dashboard');
+const route = useRoute();
+const router = useRouter();
 
-const views = {
-  dashboard: DashboardView,
-  program: ProgramView,
-  log: LogView
-};
-
-const currentView = computed(() => {
-  return views[currentTab.value] || DashboardView;
+const currentPath = computed(() => {
+  return route.path;
 });
 
 // Tab Navigation Items
 const tabs = [
-  { id: 'dashboard', label: 'Charts', icon: 'chart' },
-  { id: 'program', label: 'Program', icon: 'list' },
-  { id: 'log', label: 'Log', icon: 'pen' }
+  { path: '/dashboard', label: 'Charts', icon: 'chart' },
+  { path: '/program', label: 'Program', icon: 'list' },
+  { path: '/log', label: 'Log', icon: 'pen' }
 ];
+
+const navigateTo = (path) => {
+  router.push(path);
+};
 </script>
 
 <template>
   <div class="line-mini-app safe-area">
+    <TopNavbar />
+    
     <div class="content-wrapper">
-      <!-- Debug -->
-      <!-- <div style="color: red; padding: 10px;">Current Tab: {{ currentTab }}</div> -->
-      
-      <!-- Dynamic Component View -->
-      <component :is="currentView" />
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </div>
 
     <!-- Bottom Navigation Bar -->
     <nav class="bottom-nav glass-nav">
       <button 
         v-for="tab in tabs" 
-        :key="tab.id"
+        :key="tab.path"
         class="nav-item"
-        :class="{ active: currentTab === tab.id }"
-        @click="currentTab = tab.id"
+        :class="{ active: currentPath === tab.path }"
+        @click="navigateTo(tab.path)"
       >
         <div class="icon-box">
           <!-- Inline SVGs for Icons -->
@@ -76,8 +75,10 @@ const tabs = [
   max-width: 600px;
   margin: 0 auto;
   padding: 20px;
+  padding-top: calc(54px + 20px + env(safe-area-inset-top)); /* Make room for absolute Top Navbar */
   padding-bottom: 90px; /* Adjusted space for bottom nav */
   height: 100vh;
+  box-sizing: border-box;
   overflow-y: auto; /* Scrollable content area */
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   scrollbar-width: none; /* Firefox */
