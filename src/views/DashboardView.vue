@@ -7,11 +7,12 @@ import { useSessionStore } from '../stores/sessionStore.js';
 
 const sessionStore = useSessionStore();
 
+// Default to an empty string initially, the watcher will populate it if exercises exist
 const filters = ref({
-  exercise: 'all', 
+  exercise: '', 
   rmType: '3RM',
   year: new Date().getFullYear(),
-  month: new Date().getMonth() + 1
+  month: 'all'
 });
 
 // Computed properties reading directly from the Pinia Store
@@ -23,14 +24,24 @@ const uniqueExercises = computed(() => {
   return Array.from(exSet).sort();
 });
 
+// Watch for changes in uniqueExercises to auto-select the first valid exercise 
+// if current selection is empty or invalid
+watch(uniqueExercises, (newEx) => {
+  if (newEx.length > 0 && !newEx.includes(filters.value.exercise)) {
+    filters.value.exercise = newEx[0];
+  } else if (newEx.length === 0) {
+    filters.value.exercise = '';
+  }
+}, { immediate: true });
+
 // Highcharts Series array
 const chartSeries = computed(() => {
-  // If "all" (default) is selected, fallback to the first exercise they've tracked
-  const firstAvailable = uniqueExercises.value.length > 0 ? uniqueExercises.value[0] : 'Squat';
-  const selectedEx = filters.value.exercise === 'all' ? firstAvailable : filters.value.exercise;
+  if (uniqueExercises.value.length === 0 || !filters.value.exercise) return [];
+
+  const selectedEx = filters.value.exercise;
   
   // Primary Axis (Index 0) - Weight
-  const weightData = sessionStore.getChartSeriesForExercise(selectedEx);
+  const weightData = sessionStore.getChartSeriesForExercise(selectedEx, filters.value.rmType, filters.value.year, filters.value.month);
   
   // Secondary Axis (Index 1) - Body Fat (Mock placeholder for MVP, could use another store later)
   // Generating a flat mock line matching the datetimes of the real weightData if it exists
@@ -69,7 +80,7 @@ const sparklines = computed(() => {
   if (topExercises.length === 0) return [];
 
   return topExercises.map(ex => {
-    const data = sessionStore.getChartSeriesForExercise(ex);
+    const data = sessionStore.getChartSeriesForExercise(ex, filters.value.rmType, filters.value.year, filters.value.month);
     const yValues = data.map(d => d[1]);
     
     // Default values for short data
@@ -156,8 +167,13 @@ onMounted(() => {
         <h2>Performance Overview</h2>
         <p class="section-desc">左軸代表訓練重量 (KG)，右側虛線代表體脂率 (%)，協助分析體態變化對力量的影響。</p>
       </div>
-      <div class="chart-container glass-panel">
+      <div v-if="chartSeries.length > 0" class="chart-container glass-panel">
         <HistoryChart :series="chartSeries" :dualAxis="true" />
+      </div>
+      <div v-else class="chart-container glass-panel empty-state">
+        <div class="empty-icon">📈</div>
+        <p>尚未有符合條件的訓練資料</p>
+        <span class="sub-text">請至 Program 開始記錄您的第一次訓練即可看見報表</span>
       </div>
     </div>
 
@@ -225,6 +241,34 @@ onMounted(() => {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-secondary);
+  height: 300px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.empty-state .sub-text {
+  font-size: 13px;
+  opacity: 0.8;
 }
 
 .title-area h1 {

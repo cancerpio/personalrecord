@@ -116,7 +116,7 @@ const groupedSessions = computed(() => {
         <SearchableDropdown 
           v-model="form.exercise" 
           :options="BASE_EXERCISES" 
-          placeholder="Search or add exercise (v2)..."
+          placeholder="Search or add exercise..."
         />
       </div>
 

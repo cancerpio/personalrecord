@@ -41,8 +41,8 @@ function update(key, value) {
         :value="filters.exercise" 
         @change="e => update('exercise', e.target.value)"
         class="glass-input"
+        :disabled="availableExercises.length === 0"
       >
-        <option value="all">First Available Exercise</option>
         <option v-for="ex in availableExercises" :key="ex" :value="ex">
           {{ ex }}
         </option>
@@ -54,9 +54,10 @@ function update(key, value) {
         <label class="label">Year</label>
         <select 
           :value="filters.year"
-          @change="e => update('year', parseInt(e.target.value))"
+          @change="e => update('year', e.target.value === 'all' ? 'all' : parseInt(e.target.value))"
           class="glass-input"
         >
+          <option value="all">All</option>
           <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
         </select>
       </div>
@@ -64,9 +65,10 @@ function update(key, value) {
         <label class="label">Month</label>
         <select 
           :value="filters.month" 
-          @change="e => update('month', parseInt(e.target.value))"
+          @change="e => update('month', e.target.value === 'all' ? 'all' : parseInt(e.target.value))"
           class="glass-input"
         >
+          <option value="all">All</option>
           <option v-for="m in months" :key="m" :value="m">{{ m }}月</option>
         </select>
       </div>
