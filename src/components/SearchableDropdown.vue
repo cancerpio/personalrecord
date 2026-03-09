@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 
 const props = defineProps({
   modelValue: {
@@ -19,9 +19,14 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 
 const isOpen = ref(false);
-const searchQuery = ref(props.modelValue);
+const internalSearchQuery = ref(props.modelValue);
 const customOptions = ref([]);
 const dropdownRef = ref(null);
+const inputRef = ref(null);
+
+watch(() => props.modelValue, (newVal) => {
+  internalSearchQuery.value = newVal;
+});
 
 // Load custom options from localStorage on mount
 onMounted(() => {
@@ -44,30 +49,28 @@ const handleClickOutside = (event) => {
   if (dropdownRef.value && !dropdownRef.value.contains(event.target)) {
     isOpen.value = false;
     // Reset search query to actual selected value if user clicks away without adding
-    if (searchQuery.value !== props.modelValue) {
-        searchQuery.value = props.modelValue;
+    if (internalSearchQuery.value !== props.modelValue) {
+        internalSearchQuery.value = props.modelValue;
     }
   }
 };
 
 const allOptions = computed(() => {
-  // Combine custom options (first) and base options
   const combined = [...customOptions.value, ...props.options];
-  // Remove duplicates just in case
   return [...new Set(combined)];
 });
 
 const filteredOptions = computed(() => {
-  if (!searchQuery.value) return allOptions.value;
-  const lowerQuery = String(searchQuery.value).toLowerCase();
+  if (!internalSearchQuery.value) return allOptions.value;
+  const lowerQuery = String(internalSearchQuery.value).toLowerCase();
   return allOptions.value.filter(opt => 
     opt && String(opt).toLowerCase().includes(lowerQuery)
   );
 });
 
 const canAdd = computed(() => {
-  if (!searchQuery.value) return false;
-  const q = String(searchQuery.value).trim();
+  if (!internalSearchQuery.value) return false;
+  const q = String(internalSearchQuery.value).trim();
   if (q === '') return false;
   
   const lowerQuery = q.toLowerCase();
@@ -77,25 +80,35 @@ const canAdd = computed(() => {
 
 const toggleDropdown = () => {
   isOpen.value = true;
-  searchQuery.value = ''; // clear input so user can see all options when opening
+  internalSearchQuery.value = ''; // clear input so user can see all options when opening
+};
+
+const focusInput = () => {
+  if (inputRef.value) {
+    inputRef.value.focus();
+  }
+};
+
+const handleInput = (event) => {
+  internalSearchQuery.value = event.target.value;
+  isOpen.value = true;
 };
 
 const selectOption = (option) => {
-  searchQuery.value = option;
+  internalSearchQuery.value = option;
   emit('update:modelValue', option);
   isOpen.value = false;
 };
 
 const addNewOption = () => {
-  if (!searchQuery.value) return;
-  const newOption = String(searchQuery.value).trim();
+  if (!internalSearchQuery.value) return;
+  const newOption = String(internalSearchQuery.value).trim();
   if (!newOption) return;
   
-  // Format: Capitalize first letter of each word (Title Case)
   const formattedOption = newOption.replace(/\b\w/g, l => l.toUpperCase());
 
   if (!allOptions.value.includes(formattedOption)) {
-    customOptions.value.unshift(formattedOption); // Add to top of custom list
+    customOptions.value.unshift(formattedOption); 
     localStorage.setItem('PR_CUSTOM_EXERCISES', JSON.stringify(customOptions.value));
   }
   
@@ -107,10 +120,12 @@ const addNewOption = () => {
   <div class="searchable-dropdown" ref="dropdownRef">
     <div class="input-wrapper">
       <input 
+        ref="inputRef"
         type="text" 
         class="glass-input dropdown-input"
-        v-model="searchQuery"
+        :value="internalSearchQuery"
         :placeholder="isOpen ? 'Search...' : (modelValue || placeholder)"
+        @input="handleInput"
         @focus="isOpen = true"
         @click="toggleDropdown"
       />
@@ -126,7 +141,7 @@ const addNewOption = () => {
           v-for="option in filteredOptions" 
           :key="option"
           class="option-item"
-          @click="selectOption(option)"
+          @mousedown.prevent="selectOption(option)"
         >
           {{ option }}
           <span v-if="customOptions.includes(option)" class="custom-badge">Custom</span>
@@ -138,11 +153,16 @@ const addNewOption = () => {
         No matches found.
       </div>
 
-      <!-- Add New Button -->
-      <!-- Only show Add button if there is input AND it doesn't match an existing item perfectly -->
-      <div v-if="canAdd" class="add-new-action">
-        <button class="add-btn" @click.prevent="addNewOption">
-          <span class="plus-icon">+</span> Add "{{ String(searchQuery).trim() }}"
+      <!-- Add New Button Area -->
+      <div class="add-new-action">
+        <button v-if="canAdd" class="add-btn" @mousedown.prevent="addNewOption">
+          <span class="plus-icon">+</span> Add "{{ String(internalSearchQuery).trim() }}"
+        </button>
+        <button v-else-if="!String(internalSearchQuery).trim()" class="add-btn neutral" @mousedown.prevent="focusInput">
+          <span class="plus-icon">+</span> Type above to add custom exercise...
+        </button>
+        <button v-else class="add-btn disabled" disabled>
+          "{{ String(internalSearchQuery).trim() }}" is already in the list
         </button>
       </div>
     </div>
@@ -166,6 +186,8 @@ const addNewOption = () => {
   box-sizing: border-box;
   font-size: 16px;
   cursor: text;
+  background-color: transparent;
+  color: var(--text-primary, #ffffff); 
 }
 
 .dropdown-icon {
@@ -189,17 +211,25 @@ const addNewOption = () => {
   left: 0;
   right: 0;
   max-height: 250px;
-  overflow-y: auto;
   z-index: 100;
-  padding: 8px 0;
+  padding: 8px 0 0 0; /* remove bottom padding so sticky button fits */
   display: flex;
   flex-direction: column;
+  background: var(--bg-card, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  overflow: hidden; /* Contains the children */
 }
 
 .options-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  overflow-y: auto;
+  max-height: 200px;
 }
 
 .option-item {
@@ -228,15 +258,19 @@ const addNewOption = () => {
 
 .empty-state {
   padding: 12px 16px;
-  color: #8E8E93;
+  color: var(--text-secondary, #a1a1aa);
   font-size: 14px;
   text-align: center;
 }
 
 .add-new-action {
-  padding: 8px 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  margin-top: 4px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: auto; /* keeps it at bottom */
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .add-btn {
@@ -258,6 +292,19 @@ const addNewOption = () => {
 
 .add-btn:active {
   background: rgba(16, 185, 129, 0.2);
+}
+
+.add-btn.neutral {
+  background: transparent;
+  color: #6b7280;
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.add-btn.disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  font-weight: 500;
 }
 
 .plus-icon {
