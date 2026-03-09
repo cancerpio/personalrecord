@@ -218,11 +218,11 @@ const groupedSessions = computed(() => {
 .ios-list-item label {
   font-size: 16px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--text-primary, #ffffff);
   text-transform: none;
   letter-spacing: 0;
   flex-shrink: 0;
-  width: 100px; /* Fixed width for alignment */
+  width: 90px; /* Fixed width for alignment */
 }
 
 .unit {
@@ -234,6 +234,7 @@ const groupedSessions = computed(() => {
   flex: 1;
   display: flex;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .ios-input {
@@ -248,6 +249,11 @@ const groupedSessions = computed(() => {
   outline: none;
   -webkit-appearance: none;
   appearance: none; /* remove native styling */
+  min-width: 0;
+}
+
+input[type="date"].ios-input {
+  direction: rtl; /* Force date text to right in Safari */
 }
 
 .ios-input::placeholder {
