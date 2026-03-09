@@ -15,14 +15,27 @@ export const useSessionStore = defineStore('session', {
         },
 
         // Transforms data into [timestamp, weight] format for Highcharts
-        getChartSeriesForExercise: (state) => (exerciseName, calculationType = 'PR') => {
-            const filtered = state.sessions.filter(s => s.exercise === exerciseName);
+        getChartSeriesForExercise: (state) => (exerciseName, calculationType = 'PR', year = 'all', month = 'all') => {
+            let filtered = state.sessions.filter(s => s.exercise === exerciseName);
 
-            // Group by date to find max per day depending on calculation logic
+            if (year !== 'all') {
+                filtered = filtered.filter(s => parseInt(s.date.split('-')[0]) === year);
+            }
+            if (month !== 'all') {
+                filtered = filtered.filter(s => parseInt(s.date.split('-')[1]) === month);
+            }
+
+            // Map 'PR', '1RM' to 1 reps, '3RM' to 3 reps, '5RM' to 5 reps
+            let minReps = 1;
+            if (calculationType === '3RM') minReps = 3;
+            else if (calculationType === '5RM') minReps = 5;
+
+            // Filter out sets that don't meet the rep requirement
+            const repFiltered = filtered.filter(s => s.reps >= minReps);
+
+            // Group by date to find max per day
             const groupedByDate = {};
-            filtered.forEach(record => {
-                // For MVP PR, we just plot the max weight lifted that day regardless of reps. 
-                // Future iteration could use Brzycki formula for 1RM based on reps & weight.
+            repFiltered.forEach(record => {
                 const currentMax = groupedByDate[record.date] || 0;
                 if (record.weight > currentMax) {
                     groupedByDate[record.date] = record.weight;
