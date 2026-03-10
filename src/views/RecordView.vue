@@ -15,8 +15,21 @@ const form = reactive({
   reps: ''
 });
 
+const fatForm = reactive({
+  date: new Date().toISOString().split('T')[0],
+  fatPercentage: ''
+});
+
 const canSubmit = computed(() => {
   return form.date && form.exercise && form.weight && form.reps;
+});
+
+const canSubmitFat = computed(() => {
+  return fatForm.date && fatForm.fatPercentage;
+});
+
+const currentFatRecord = computed(() => {
+  return sessionStore.bodyMetrics.find(item => item.date === fatForm.date);
 });
 
 const savedSessions = computed(() => sessionStore.sessions);
@@ -42,7 +55,7 @@ const submitLog = async () => {
     await sessionStore.addSession(newRecord);
 
     // Provide some visual feedback
-    const btn = document.querySelector('.submit-btn');
+    const btn = document.querySelector('.submit-btn.training');
     if (btn) {
       const originalText = btn.innerText;
       btn.innerText = 'Saved!';
@@ -56,6 +69,50 @@ const submitLog = async () => {
   } catch (err) {
     console.error("Failed to save via store", err);
     alert('Failed to save your session. Please check your connection.');
+  }
+};
+
+const submitFatLog = async () => {
+  if (!canSubmitFat.value) return;
+  
+  const newRecord = {
+    date: fatForm.date,
+    fatPercentage: Number(fatForm.fatPercentage)
+  };
+
+  try {
+    await sessionStore.addBodyMetric(newRecord);
+
+    // Provide some visual feedback
+    const btn = document.querySelector('.submit-btn.fat');
+    if (btn) {
+      const originalText = btn.innerText;
+      btn.innerText = 'Updated!';
+      btn.style.background = '#059669'; // darker green
+      
+      setTimeout(() => {
+        btn.innerText = originalText;
+        btn.style.background = ''; // restore
+      }, 1500);
+    }
+  } catch (err) {
+    console.error("Failed to save body metric", err);
+    alert('Failed to save your body fat data. Please check your connection.');
+  }
+};
+
+const deleteFatLog = async () => {
+  const record = currentFatRecord.value;
+  if (!record) return;
+  
+  if (!confirm(`Are you sure you want to delete the body fat record for ${record.date}?`)) return;
+
+  try {
+    await sessionStore.deleteBodyMetric(record.date);
+    fatForm.fatPercentage = '';
+  } catch (err) {
+    console.error("Failed to delete body metric", err);
+    alert('Failed to delete your body fat data.');
   }
 };
 
@@ -98,12 +155,46 @@ const groupedSessions = computed(() => {
   <div class="view-container">
     <div class="header-section">
       <div class="title-area">
-        <label class="welcome">Input</label>
-        <h1>Program Record</h1>
+        <label class="welcome">Record</label>
+        <h1>Daily Log Hub</h1>
       </div>
     </div>
     
-    <!-- iOS 16 Grouped List Form -->
+    <h3 class="section-title">Body Metrics</h3>
+    <!-- iOS 16 Grouped List Form (Fat) -->
+    <div class="ios-list-group glass-card">
+      <div class="ios-list-item">
+        <label>Date</label>
+        <input type="date" class="ios-input" v-model="fatForm.date" />
+      </div>
+
+      <div class="ios-list-item">
+        <label>Body Fat <span class="unit">(%)</span></label>
+        <input type="number" inputmode="decimal" class="ios-input num-input" v-model="fatForm.fatPercentage" placeholder="0.0" />
+      </div>
+    </div>
+    <div class="fat-btn-group">
+      <button 
+        class="submit-btn fat" 
+        :disabled="!canSubmitFat"
+        @click="submitFatLog"
+      >
+        {{ currentFatRecord ? 'Update Body Metrics' : 'Save Body Metrics' }}
+      </button>
+      
+      <button 
+        v-if="currentFatRecord"
+        class="delete-btn" 
+        @click="deleteFatLog"
+      >
+        Delete
+      </button>
+    </div>
+    
+    <div style="height: 12px;"></div> <!-- Spacer -->
+    
+    <h3 class="section-title">Training</h3>
+    <!-- iOS 16 Grouped List Form (Training) -->
     <div class="ios-list-group glass-card">
       <div class="ios-list-item">
         <label>Date</label>
@@ -133,7 +224,7 @@ const groupedSessions = computed(() => {
     </div>
 
     <button 
-      class="submit-btn" 
+      class="submit-btn training" 
       :disabled="!canSubmit"
       @click="submitLog"
     >
@@ -143,7 +234,7 @@ const groupedSessions = computed(() => {
     <div v-if="savedSessions.length > 0" class="history-section">
       <h3 class="section-title">Saved Sessions</h3>
       <div class="ios-list-group glass-card session-list">
-        <div v-for="group in groupedSessions" :key="group.id" class="session-card" @click="router.push('/program/session')">
+        <div v-for="group in groupedSessions" :key="group.id" class="session-card" @click="router.push({ path: '/program/session', query: { date: group.date, exercise: group.exercise } })">
           <div class="session-header">
             <span class="exercise-name">{{ group.exercise }}</span>
             <span class="session-date">{{ group.date }}</span>
@@ -296,6 +387,33 @@ input[type="number"] {
   color: rgba(255, 255, 255, 0.3);
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.fat-btn-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.fat-btn-group .submit-btn {
+  margin-top: 0;
+  flex: 1;
+}
+
+.delete-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 16px;
+  padding: 0 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-btn:active {
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .history-section {

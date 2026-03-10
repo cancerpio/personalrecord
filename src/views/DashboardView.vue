@@ -43,13 +43,8 @@ const chartSeries = computed(() => {
   // Primary Axis (Index 0) - Weight
   const weightData = sessionStore.getChartSeriesForExercise(selectedEx, filters.value.rmType, filters.value.year, filters.value.month);
   
-  // Secondary Axis (Index 1) - Body Fat (Mock placeholder for MVP, could use another store later)
-  // Generating a flat mock line matching the datetimes of the real weightData if it exists
-  const bodyFatData = weightData.map(point => {
-    // Drop by 0.1% per day roughly
-    const offset = Math.random() * 0.5 - 0.25; 
-    return [point[0], 15.5 + offset];
-  });
+  // Secondary Axis (Index 1) - Body Fat 
+  const bodyFatData = sessionStore.getChartSeriesForBodyFat(filters.value.year, filters.value.month);
 
   return [
     {
@@ -64,7 +59,7 @@ const chartSeries = computed(() => {
       name: 'Body Fat %',
       type: 'spline',
       color: '#fb923c', // Orange Warn
-      data: bodyFatData.length > 0 ? bodyFatData : [[Date.now(), 15.5]],
+      data: bodyFatData,
       yAxis: 1,
       dashStyle: 'ShortDash',
       marker: { enabled: false }
