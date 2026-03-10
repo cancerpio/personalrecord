@@ -82,6 +82,46 @@ VITE_API_BASE_URL='https://api.yourdomain.com'
 
 ---
 
+## 5. 資料庫結構與實作設計 (Firestore Data Model)
+
+為了滿足 MVP 的需求，並以 NoSQL 結構最大化存取效能，我們建議採用以下的 Firestore Collection 結構：
+
+### Collection: `users` (使用者設定與基本資料)
+每位使用者只有一份 Document，`docId` 直接使用 LINE 的 `userId`，方便快速查詢。
+* `__name__` (Doc ID): `{LINE_USER_ID}` (例如 `U1234567890abcdef...`)
+* `displayName` (string): 使用者 LINE 暱稱。
+* `pictureUrl` (string): 大頭貼網址。
+* `settings` (map): 放推播防怠惰開關設定 (與目前全域的 `PR_SETTINGS` 對齊)。
+* `createdAt` (timestamp): 首次註冊時間。
+* `updatedAt` (timestamp): 最新更新時間。
+
+### Collection: `training_sessions` (訓練紀錄)
+每一組 (Set) 的紀錄都是一篇獨立的 Document。
+* `__name__` (Doc ID): `{自動產生的 Firestore ID}`
+* `userId` (string): 關聯的 LINE `userId`（必定加上 Index 以便篩選該推播的使用者）。
+* `date` (string): `YYYY-MM-DD` 格式（前端傳入的訓練日期）。
+* `exercise` (string): 動作名稱 (例如 `Squat`)。
+* `weight` (number): 重量 (公斤/磅)。
+* `reps` (number): 次數。
+* `sets` (number): 組數(或編號)。
+* `rtype` (string): `RM` 或是 `Volume`。
+* `createdAt` (timestamp)
+* `updatedAt` (timestamp)
+
+### Collection: `body_metrics` (體脂與體重數據)
+每天一筆，可以用 `userId_YYYY-MM-DD` 的形式當作 `docId` 實現天然且無重複地 Upsert 行為。
+* `__name__` (Doc ID): `{LINE_USER_ID}_{YYYY-MM-DD}` (例如 `U1234_2026-03-10`)
+* `userId` (string): 關聯的 LINE `userId`。
+* `date` (string): `YYYY-MM-DD`。
+* `fatPercentage` (number): 體脂率 %。
+* `bodyWeight` (number): 體重 KG。
+* `createdAt` (timestamp)
+* `updatedAt` (timestamp)
+
+> 💡 **Firebase 開發實戰：** 初期為了無痛開發與除錯，我們會在本機啟動 `express` 伺服器，並使用一個變數 `const mockDb = {}` 作為 In-Memory Mock DB 暫存上述的 Collection。待架構與前端 UI 對接成功後，只需把 CRUD 的部份換成真實的 `firebase-admin/firestore` SDK 即可無縫接軌。
+
+---
+
 > **給 AI Agent 的實作指引 (API Design Example)**:
 > 
 > ```http
@@ -98,3 +138,19 @@ VITE_API_BASE_URL='https://api.yourdomain.com'
 >   "rtype": "RM"
 > }
 > ```
+
+---
+
+## Need to Confirm
+
+* **[AI 提出] 後端環境初始化方式**：由於時間緊迫，請問要直接在目錄下建立 `functions` 結構以相容 Firebase Cloud Functions，還是先建立一般標準的 `backend` (Node.js/Express) 目錄，之後再決定部署平台？（建議先建立標準 Express + TypeScript API Server，方便本機獨立測試）
+* **[AI 提出] 資料庫/環境變數狀況**：目前是否已經建立好 Firebase 專案並取得儲存金鑰 (`serviceAccountKey.json`)？若無，是否同意先以記憶體模擬 (Mock DB) 讓 API 端點運作，優先確保前後端串接完成？
+
+---
+
+## QA 紀錄
+
+| 紀錄時間 | 問題 / 討論重點 | 結論 / 狀態 |
+| :--- | :--- | :--- |
+| `2026-03-10 17:37` | **使用者指示**：<br>確認後續討論將以後端及前後端整合為主，確立規格文件的更新原則（全端整合更新 `spec_and_tasks_mvp.md`，後端更新 `spec-backend-mvp.md`，前端更新 `spec-behavior-mvp.md`）。因時間緊迫，要求立即開始建置後端架構。 | **AI 結論**：<br>已了解文件更新守則，並於本文件加上 `Need to Confirm` 與 `QA 紀錄` 區塊，統一追蹤未來後端開發過程的決策。同步產生了 MVP 後端開發的 API Task List 與 Implementation Plan，待確認後即刻動工。 |
+| `2026-03-10 17:45` | **使用者提問**：<br>1. 是否能在 Mini App (LIFF) 中取得使用者 ID，以便後端存資料與發送推播通知 (Push Message)？<br>2. 如何部署 Firebase Functions 與 Firestore？<br>3. 要求 AI 根據最新規格實作資料表設計與 In-Memory 的 Backend API 雛形。 | **AI 結論**：<br>1. **LINE User ID 擷取與推播解答**：其實目前透過 LIFF 是有辦法拿到 `userId` 的！前端調用 `liff.getProfile()` 即可取得；而在與後端 API 溝通時，前端應呼叫 `liff.getIDToken()` 並作為 JWT 送給後端。後端使用 LINE 官方 SDK (或自建解碼程式) 驗證該 Token 後，即可解出其中藏著的 `sub`，該值就是真實的 `userId`。只要這位使用者**有將你的官方帳號 (Official Account) 加入好友**，你後端隨時可以呼叫 LINE Messaging API (`POST https://api.line.me/v2/bot/message/push`) 並帶上這組 `userId` 來發送收費的 Push Message 推播。<br>2. **部署教學解答**：只需四個步驟：(A) 註冊 Firebase Console 並啟用 Firestore Database (Native 模式) 以及升級到 Blaze 付費方案 (要部署 Node18+ 必須綁卡)。 (B) 在本機 `npm install -g firebase-tools`。 (C) `firebase login` 並 `firebase init functions`。 (D) 撰寫好 Express app 匯出給 Firebase 後，打 `firebase deploy --only functions` 即可上線。<br>3. **動工確認**：已於檔案上方更新「**5. 資料庫結構與實作設計 (Firestore Data Model)**」。並準備切換至 Execution 模式為您馬上建置 In-Memory Mock DB 版的本地 API。 |
