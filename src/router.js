@@ -1,7 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import DashboardView from './views/DashboardView.vue'
-import ProgramView from './views/ProgramView.vue'
-import LogView from './views/LogView.vue'
+import RecordView from './views/RecordView.vue'
+import SettingsView from './views/SettingsView.vue'
 import SessionDetailView from './views/SessionDetailView.vue'
 
 const routes = [
@@ -16,9 +16,9 @@ const routes = [
         meta: { title: 'Strength and Conditioning Analytics' }
     },
     {
-        path: '/program',
-        name: 'Program',
-        component: ProgramView,
+        path: '/record',
+        name: 'Record',
+        component: RecordView,
         meta: { title: 'Program Record' }
     },
     {
@@ -28,10 +28,10 @@ const routes = [
         meta: { title: 'Edit Session' }
     },
     {
-        path: '/log',
-        name: 'Log',
-        component: LogView,
-        meta: { title: 'Training Logs' }
+        path: '/settings',
+        name: 'Settings',
+        component: SettingsView,
+        meta: { title: 'Settings' }
     }
 ]
 

@@ -54,14 +54,14 @@
     - [ ] Task 2.3: 實作 LocalStorage 的儲存/讀取邏輯 (針對 Custom Exercises)。
 
 ### Feature 3: 全域導覽系統 (Navigation System)
-*   **User Behavior**: 透過底部的 Tab Bar 快速切換 Dashboard、Program (紀錄)、Profile (設定)。在特定深蹲紀錄頁面，能透過左上角回上一頁。
+*   **User Behavior**: 透過底部的 Tab Bar 快速切換 Dashboard (儀表板)、Record (紀錄Hub)、Settings (設定)。在特定深蹲紀錄頁面，能透過左上角回上一頁。
 *   **Frontend Implementation**: 
     - 實作 `<BottomTabBar>` 元件，使用 `lucide-vue-next` icon，掛載於 `App.vue`。
     - 實作 `<TopNavBar>` 元件供子頁面引入。
 *   **Technical Constraints**: Tab Bar 需避開 iOS 底部 Safe Area (Home Indicator)。
 *   **AI Execution Tasks**:
-    - [ ] Task 3.1: 實作 Router 架構與基礎頁面 (Dashboard, Log, Settings)。
-    - [ ] Task 3.2: 實作 `BottomTabBar` UI 元件並加入 Safe Area padding。
+    - [x] (已完成) 實作 Router 架構與基礎頁面 (Dashboard, Record, Settings)。
+    - [x] (已完成) 實作 `BottomTabBar` UI 元件並加入 Safe Area padding。
 
 ### Feature 4: 統一資料服務層與 Pinia 串接 (Unified Data Layer)
 *   **User Behavior**: 使用者對 App 的儲存位置感到無縫，系統依據環境變數切換，且圖表能即時反應 Program 頁面輸入的新紀錄。
@@ -83,13 +83,36 @@
     - [ ] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
     - [ ] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
 
-### Feature 5: Program View UI/UX Enhancement (iOS 16 Liquid Glass)
-*   **User Behavior**: 使用者在記錄新訓練時，享有更大、更清晰、更現代的輸入體驗。點擊數字欄位時，自動彈出專屬的大型九宮格數字鍵盤。
-*   **Frontend Implementation**:
-    - **UI Style**: 採用 iOS 16 Settings App 風格的「Grouped List (清單群組)」排版。標題與欄位水平置放，搭配透明毛玻璃卡片底色與細緻分隔線。
-    - **Input UX**: 數字輸入框屬性改為 `inputmode="decimal"` 以支援九宮格鍵盤。使用 CSS `::-webkit-inner-spin-button` 徹底隱藏預設的上下箭頭。
-*   **Technical Constraints**: `inputmode="decimal"` 行為依賴 OS 虛擬鍵盤支援，但目前為 iOS/Android 雙平台標準。
+### Feature 6: Ultimate Hub Architecture (Record & Settings)
+*   **User Behavior**:
+    - **Tab 2 (Record)**：一站式輸入中心。頁面同時包含「體脂率 (Body Metrics)」卡片與「訓練動作 (Training)」卡片。體脂率一天限定儲存一次 (同日儲存則發動 Upsert 覆蓋)；訓練動作則可無限新增。
+    - **Tab 3 (Settings)**：將先前的空白 Log 頁面改造為系統設定頁面。包含通知推播防怠惰開關。
+*   **Frontend Implementation (Record View)**:
+    - **UI Style**: 兩個卡片皆採用 ProgramView 現有的 `ios-list-group` CSS 結構。
+    - **Chart Integration**: 修改 `DashboardView` 右側橘虛線，使其綁定全新的 `sessionStore.getChartSeriesForBodyFat(year, month)` 真實數據，具備動態過濾與防呆狀態。
+*   **Frontend Implementation (Settings View)**:
+    - 只需實作介面邏輯 (UI State) 讓使用者自訂三種防怠惰機制的開關，狀態先存回 `localStorage`：
+      1. 連續 4 週未更換訓練動作。
+      2. 連續 7 天未訓練。
+      3. 連續 14 天未測量體脂。
+*   **Data Structure**: 新增 `PR_BODY_METRICS` Storage Model，Schema 為 `[date: string, fatPercentage: number]`。新增 `PR_SETTINGS` 儲存 User Notification Preferences。
 *   **AI Execution Tasks**:
-    - [x] (已完成) 調整 `ProgramView.vue` 佈局為 iOS 16 Grouped List。
-    - [x] (已完成) 調整 `SearchableDropdown.vue` 樣式以適應新佈局 (右靠齊、去背)。
-    - [x] (已完成) 隱藏 HTML 原生數字箭頭並實作 `inputmode="decimal"` 行為。
+    - [x] (已完成) Task 6.1: 擴充 `LocalService.js` 支援體脂率 CRUD (防呆 Upsert)。
+    - [x] (已完成) Task 6.2: 擴充 `sessionStore.js` 新增 `bodyMetrics` 獲取與繪圖轉換函數。
+    - [x] (已完成) Task 6.3: 修改 router 與 Tab Bar，將對應頁面正式命名為 Record 與 Settings。
+    - [x] (已完成) Task 6.4: 改造 `RecordView.vue` 加入體脂率輸入區塊，並將主圖表連動至該真實資料。
+    - [x] (已完成) Task 6.5: 開發 `SettingsView.vue` iOS Switch 介面，並記錄使用者通知偏好。
+
+### Feature 7: 歷史紀錄管理 (History Data Management CRUD)
+*   **User Behavior**:
+    - **體脂率刪除**：使用者在 Record 頁面，如果選擇的日期已經有體脂紀錄，可以點擊 Delete 按鈕刪除該筆資料。
+    - **訓練紀錄修改與刪除**：使用者可以在 Record 頁面下方的 Saved Sessions 清單中，點擊任何一筆訓練紀錄，進入 Session Detail 頁面。在此頁面中，可以針對單一 Set 的重量/次數進行修改，或者將該 Set 刪除。當該動作的所有 Set 都被刪除時，自動返回上一頁。
+*   **Frontend Implementation**:
+    - **RecordView**: 擴增 `deleteBodyMetric` 按鈕與狀態判斷 `currentFatRecord`。
+    - **SessionDetailView**: 實作接收 `route.query.date` 與 `route.query.exercise`，動態從 `sessionStore` 過濾出需要編輯的 Sets，並提供 `updateSession` 與 `deleteSession` 的 UI 操作與本地副本 (Local Reactive Copy) 同步機制。
+*   **Data Structure**: API (`api.js`) 與底層 (`LocalService.js`) 需實作真正的刪除與更新邏輯，不採用 Soft Delete 以保持 MVP 輕量。
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 7.1: 擴充 `LocalService.js` 與 `sessionStore.js` 支援 Session 的 Update 與 Delete。
+    - [x] (已完成) Task 7.2: 擴充 `LocalService.js` 與 `sessionStore.js` 支援 BodyMetric 的 Delete。
+    - [x] (已完成) Task 7.3: 開發 `SessionDetailView.vue` 單組編輯/刪除頁面。
+    - [x] (已完成) Task 7.4: 於 `RecordView.vue` 實作體脂率刪除按鈕並串接訓練清單跳轉。
