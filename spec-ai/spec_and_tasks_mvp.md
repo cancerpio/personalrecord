@@ -23,7 +23,8 @@
 全面採用 RESTful API 架構，前端透過 `VITE_STORAGE_MODE` 切換實作：
 1.  **`local`**: 不發 HTTP Request，純 `localStorage` 存取。
 2.  **`liff`**: 呼叫遠端 API，使用 LINE `liff.getIDToken()` 進行 JWT 驗證 (`Bearer <IDToken>`)。
-*   **後端建議架構**: Node.js (Express/Fastify) + Firebase Cloud Functions + Firestore，完全抽離 Firebase Client SDK，擁抱 REST API。
+*   **後端架構與 API 端點**: 已實作為 Express + TypeScript 於 `backend/src/index.ts`。所有 `/api/v1/*` 端點及 LINE 驗證 Middleware 皆在此處。
+*   **資料庫 Schema 與部署**: Firestore 資料表設計請見 `spec-backend-mvp.md` 第 5 節；從 In-Memory 轉換至真實 Firebase Cloud Functions 的操作請見 `spec-ai/firebase-deploy.md`。
 
 ---
 
