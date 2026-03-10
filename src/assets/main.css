@@ -2,6 +2,7 @@
   --app-bg: #F2F2F7;
   /* iOS grouped background light */
   --card-bg-blur: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.4);
   --text-primary: #000000;
   --text-secondary: #8E8E93;
   --accent-color: #007AFF;
@@ -19,10 +20,29 @@
   :root {
     --app-bg: #000000;
     --card-bg-blur: rgba(28, 28, 30, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.1);
     --text-primary: #FFFFFF;
     --text-secondary: #98989E;
     --separator-color: #38383A;
   }
+}
+
+:root[data-theme="light"] {
+  --app-bg: #F2F2F7;
+  --card-bg-blur: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --text-primary: #000000;
+  --text-secondary: #8E8E93;
+  --separator-color: #C6C6C8;
+}
+
+:root[data-theme="dark"] {
+  --app-bg: #000000;
+  --card-bg-blur: rgba(28, 28, 30, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --text-primary: #FFFFFF;
+  --text-secondary: #98989E;
+  --separator-color: #38383A;
 }
 
 body {
@@ -56,7 +76,7 @@ body {
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   /* iOS 16 Vibrancy */
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--glass-border);
   /* Slightly stronger border for glass effect */
   box-shadow: var(--shadow-sm);
 }
@@ -70,7 +90,7 @@ body {
   margin-bottom: 20px;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   /* Liquid style shadow */
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--glass-border);
 }
 
 /* Typography */

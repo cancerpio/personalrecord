@@ -133,3 +133,20 @@
     - [x] (已完成) Task 8.1: 擴充 `sessionStore` 新增 `getChartSeriesForBodyWeight` getter。
     - [x] (已完成) Task 8.2: 更新 `DashboardView` 納入體重曲線 (Primary Y-axis)。
     - [x] (已完成) Task 8.3: 更新 `RecordView` 的 UI 結構，將表單擴增支援體重，並調整 Upsert Payload。
+
+### Feature 9: 日夜間模式切換與全域主題套用 (Dark/Light Mode Theme Management)
+*   **User Behavior**:
+    - **自動跟隨系統**：預設狀態下，APP 主題會直接讀取使用者作業系統的日/夜間模式 (透過 CSS `prefers-color-scheme`)。
+    - **自定義切換**：在 Settings 頁面新增「Auto Theme / Dark Mode」選項。若關閉自動主題，可選擇強制固定在 Light Mode 或 Dark Mode。
+    - **圖表文字可視化**：Dashboard 的圖表文字與座標軸在 Light Mode 也不會變成全白隱形，支援動態讀取 CSS Variable 變色。
+*   **Frontend Implementation**:
+    - **CSS Architecture**: 於 `main.css` 定義 `:root` (預設亮色) 與 `@media (prefers-color-scheme: dark)` (系統暗色)，並透過 `:root[data-theme="light/dark"]` 提供最高選擇器權重以強制覆寫主題。
+    - **Theme Injector**: 於 `App.vue` 載入時讀取 LocalStorage (`PR_SETTINGS.themeMode`)，若非 `auto` 則寫入 `<html data-theme="...">`；並監聽 `storage` 事件達成跨分頁同步。
+    - **Highcharts Dynamic Colors**: 修改 `HistoryChart.vue`，捨棄 Hardcode 色碼，全面改用語法如 `color: 'var(--text-primary)'` 讓圖表隨主題變色。
+*   **Data Structure**:
+    - `PR_SETTINGS` LocalStorage JSON 新增屬性：`themeMode: 'auto' | 'light' | 'dark'`。
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 9.1: 重構 `main.css` 導入 `data-theme` 變數覆寫機制。
+    - [x] (已完成) Task 9.2: 修改 `SettingsView.vue` 實作 Theme Toggle UI 並綁定設定。
+    - [x] (已完成) Task 9.3: 於 `App.vue` 實作掛載時的 Theme Injector。
+    - [x] (已完成) Task 9.4: 全面清洗圖表、導航列、標題漸層色碼，替換為 `--text-primary` 與 `--glass-border` 等動態變量。

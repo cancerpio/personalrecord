@@ -32,23 +32,23 @@ const chartOptions = computed(() => ({
     height: 300,
     spacingTop: 20
   },
-  title: { text: '' },
+  title: { text: null },
   xAxis: {
     type: 'datetime',
     labels: {
-      style: { color: '#8E8E93' },
+      style: { color: 'var(--text-secondary)' },
       format: '{value:%b %d}'
     },
-    gridLineColor: 'rgba(255,255,255,0.1)',
-    lineColor: 'rgba(255,255,255,0.1)', // Updated from transparent
+    gridLineColor: 'var(--glass-border)',
+    lineColor: 'var(--glass-border)',
     tickColor: 'transparent'
   },
   yAxis: props.dualAxis ? [
     { // Primary Axis (Left - Weight)
       title: { text: null },
-      gridLineColor: 'rgba(255,255,255,0.05)',
+      gridLineColor: 'var(--glass-border)',
       labels: { 
-        style: { color: '#8E8E93' },
+        style: { color: 'var(--text-secondary)' },
         format: '{value} KG'
       }
     },
@@ -63,24 +63,25 @@ const chartOptions = computed(() => ({
     }
   ] : { // Single Axis
     title: { text: null },
-    gridLineColor: 'rgba(255,255,255,0.05)',
+    gridLineColor: 'var(--glass-border)',
     labels: { 
-      style: { color: '#8E8E93' },
+      style: { color: 'var(--text-secondary)' },
       format: props.yAxisLabel === 'Ratio' ? '{value}x' : '{value}'
     }
   },
   legend: {
     enabled: true,
-    itemStyle: { color: '#ffffff', fontWeight: 'normal' },
-    itemHoverStyle: { color: '#ffffff' }
+    itemStyle: { color: 'var(--text-primary)', fontWeight: 'normal' },
+    itemHoverStyle: { color: 'var(--text-primary)' }
   },
   tooltip: {
     shared: true,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    style: { color: '#ffffff' },
+    backgroundColor: 'var(--card-bg-blur)',
+    style: { color: 'var(--text-primary)' },
     borderRadius: 12,
-    borderWidth: 0,
-    shadow: false,
+    borderWidth: 1,
+    borderColor: 'var(--glass-border)',
+    shadow: true,
     headerFormat: '<span style="font-size: 10px">{point.key:%b %d}</span><br/>'
   },
   series: props.series,

@@ -6,7 +6,8 @@ const STORAGE_KEY = 'PR_SETTINGS';
 const settings = ref({
   notifyStaleExercise: true,
   notifyNoTraining: true,
-  notifyNoBodyFat: true
+  notifyNoBodyFat: true,
+  themeMode: 'auto'
 });
 
 onMounted(() => {
@@ -16,10 +17,25 @@ onMounted(() => {
   }
 });
 
-// Auto-save on change
+// Auto-save and apply theme on change
 watch(settings, (newVal) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
+  
+  if (newVal.themeMode && newVal.themeMode !== 'auto') {
+    document.documentElement.setAttribute('data-theme', newVal.themeMode);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
 }, { deep: true });
+
+const toggleAutoTheme = (e) => {
+  if (e.target.checked) {
+    settings.value.themeMode = 'auto';
+  } else {
+    const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    settings.value.themeMode = isSystemDark ? 'dark' : 'light';
+  }
+};
 
 </script>
 
@@ -32,6 +48,33 @@ watch(settings, (newVal) => {
       </div>
     </div>
     
+    <h3 class="section-title">Appearance</h3>
+    <p class="section-desc">Customize your app interface.</p>
+    
+    <div class="ios-list-group glass-card">
+      <div class="ios-list-item">
+        <div class="item-text">
+          <label>Auto Theme</label>
+          <span class="sub-label">Follow System Preferences</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" :checked="settings.themeMode === 'auto'" @change="toggleAutoTheme($event)">
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <div class="ios-list-item" v-if="settings.themeMode !== 'auto'">
+        <div class="item-text">
+          <label>Dark Mode</label>
+          <span class="sub-label">Manual override</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" :checked="settings.themeMode === 'dark'" @change="settings.themeMode = $event.target.checked ? 'dark' : 'light'">
+          <span class="slider round"></span>
+        </label>
+      </div>
+    </div>
+
     <h3 class="section-title">LINE Notifications</h3>
     <p class="section-desc">Stay accountable with smart reminders sent directly to your LINE.</p>
     
@@ -91,7 +134,8 @@ watch(settings, (newVal) => {
   font-weight: 800;
   margin: 0;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-color) 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

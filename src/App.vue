@@ -10,6 +10,30 @@ const currentPath = computed(() => {
   return route.path;
 });
 
+// Apply theme on load
+const applyTheme = () => {
+  try {
+    const saved = localStorage.getItem('PR_SETTINGS');
+    if (saved) {
+      const settings = JSON.parse(saved);
+      if (settings.themeMode && settings.themeMode !== 'auto') {
+        document.documentElement.setAttribute('data-theme', settings.themeMode);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse settings', e);
+  }
+};
+
+applyTheme();
+
+// Listen to local storage changes to sync theme across tabs/updates inside settings
+window.addEventListener('storage', (e) => {
+  if (e.key === 'PR_SETTINGS') applyTheme();
+});
+
 // Tab Navigation Items
 const tabs = [
   { path: '/dashboard', label: 'Dashboard', icon: 'chart' },
@@ -102,12 +126,12 @@ const navigateTo = (path) => {
   justify-content: space-around;
   align-items: center;
   z-index: 100;
-  border-top: 0.5px solid rgba(255, 255, 255, 0.15); /* Thinner border */
+  border-top: 0.5px solid var(--glass-border);
   box-sizing: content-box; /* Ensure padding doesn't affect height calculation */
 }
 
 .glass-nav {
-  background: rgba(22, 22, 30, 0.85); /* Darker, premium feel */
+  background: var(--card-bg-blur);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -124,17 +148,18 @@ const navigateTo = (path) => {
   gap: 3px; /* Tighter gap */
   padding: 4px 0;
   cursor: pointer;
-  color: #8E8E93; /* iOS inactive gray */
+  color: var(--text-secondary);
   transition: color 0.2s ease;
 }
 
 .nav-item.active {
-  color: #a5b4fc; /* Accent color */
+  color: var(--accent-color);
 }
 
 .nav-item.active .nav-icon {
   stroke-width: 2.5;
-  filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.3));
+  filter: drop-shadow(0 0 6px var(--accent-color));
+  opacity: 0.6;
 }
 
 .icon-box {
