@@ -116,3 +116,20 @@
     - [x] (已完成) Task 7.2: 擴充 `LocalService.js` 與 `sessionStore.js` 支援 BodyMetric 的 Delete。
     - [x] (已完成) Task 7.3: 開發 `SessionDetailView.vue` 單組編輯/刪除頁面。
     - [x] (已完成) Task 7.4: 於 `RecordView.vue` 實作體脂率刪除按鈕並串接訓練清單跳轉。
+
+### Feature 8: 體重追蹤與圖表疊合 (Body Weight Tracking)
+*   **User Behavior**:
+    - **體重輸入**：在 Record 頁面的「Body Metrics」卡片中，除了體脂率外，新增「體重 (Body Weight, KG)」的輸入框。兩者可獨立或同時輸入，每日同樣發動 Upsert (覆蓋/新增)。
+    - **圖表顯示**：Dashboard 會新增一條代表「體重」的線條。由於單位是 KG，它將與「訓練重量」共用**左側主 Y 軸 (Primary Y-axis)**，方便使用者直觀比對「絕對力量」與「自體重」的趨勢變化。
+    - **數據判讀 (The X-ray Theory)**：
+        - **黃金交叉 (大好)**：訓練重量 ↗、自身體重 ↘。代表增肌減脂成功，相對力量 (力量體重比) 大幅提升。
+        - **死亡交叉 (大壞)**：訓練重量 ↘、自身體重 ↗。代表肌肉流失脂肪增加，或進入嚴重訓練過度 (Overtraining)，需警覺。
+        - **平行發展 (正常)**：一同上升為標準增肌期 (Bulking)；一同下降為預期內的減脂期 (Cutting) 力量耗損。
+*   **Frontend Implementation**:
+    - **RecordView**: 擴充 `fatForm` 為 `bodyMetricsForm`，加入 `bodyWeight` 欄位。
+    - **DashboardView**: 新增一條 Highcharts 曲線 (Series) 給體重，綁定左側 YAxis (0)。
+*   **Data Structure**: 原 `PR_BODY_METRICS` Schema 擴充：由 `[date, fatPercentage]` 升級為 `[date: string, fatPercentage: number?, bodyWeight: number?]`。
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 8.1: 擴充 `sessionStore` 新增 `getChartSeriesForBodyWeight` getter。
+    - [x] (已完成) Task 8.2: 更新 `DashboardView` 納入體重曲線 (Primary Y-axis)。
+    - [x] (已完成) Task 8.3: 更新 `RecordView` 的 UI 結構，將表單擴增支援體重，並調整 Upsert Payload。

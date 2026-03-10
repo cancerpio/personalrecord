@@ -17,7 +17,8 @@ const form = reactive({
 
 const fatForm = reactive({
   date: new Date().toISOString().split('T')[0],
-  fatPercentage: ''
+  fatPercentage: '',
+  bodyWeight: ''
 });
 
 const canSubmit = computed(() => {
@@ -25,12 +26,24 @@ const canSubmit = computed(() => {
 });
 
 const canSubmitFat = computed(() => {
-  return fatForm.date && fatForm.fatPercentage;
+  return fatForm.date && (fatForm.fatPercentage || fatForm.bodyWeight);
 });
 
 const currentFatRecord = computed(() => {
   return sessionStore.bodyMetrics.find(item => item.date === fatForm.date);
 });
+
+import { watch } from 'vue';
+
+watch(currentFatRecord, (newRecord) => {
+  if (newRecord) {
+    fatForm.fatPercentage = newRecord.fatPercentage !== undefined ? newRecord.fatPercentage : '';
+    fatForm.bodyWeight = newRecord.bodyWeight !== undefined ? newRecord.bodyWeight : '';
+  } else {
+    fatForm.fatPercentage = '';
+    fatForm.bodyWeight = '';
+  }
+}, { immediate: true });
 
 const savedSessions = computed(() => sessionStore.sessions);
 
@@ -76,9 +89,16 @@ const submitFatLog = async () => {
   if (!canSubmitFat.value) return;
   
   const newRecord = {
-    date: fatForm.date,
-    fatPercentage: Number(fatForm.fatPercentage)
+    date: fatForm.date
   };
+
+  if (fatForm.fatPercentage !== '') {
+    newRecord.fatPercentage = Number(fatForm.fatPercentage);
+  }
+
+  if (fatForm.bodyWeight !== '') {
+    newRecord.bodyWeight = Number(fatForm.bodyWeight);
+  }
 
   try {
     await sessionStore.addBodyMetric(newRecord);
@@ -110,6 +130,7 @@ const deleteFatLog = async () => {
   try {
     await sessionStore.deleteBodyMetric(record.date);
     fatForm.fatPercentage = '';
+    fatForm.bodyWeight = '';
   } catch (err) {
     console.error("Failed to delete body metric", err);
     alert('Failed to delete your body fat data.');
@@ -166,6 +187,11 @@ const groupedSessions = computed(() => {
       <div class="ios-list-item">
         <label>Date</label>
         <input type="date" class="ios-input" v-model="fatForm.date" />
+      </div>
+
+      <div class="ios-list-item">
+        <label>Body Weight <span class="unit">(KG)</span></label>
+        <input type="number" inputmode="decimal" class="ios-input num-input" v-model="fatForm.bodyWeight" placeholder="0.0" />
       </div>
 
       <div class="ios-list-item">
