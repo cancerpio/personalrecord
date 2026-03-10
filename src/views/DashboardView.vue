@@ -42,6 +42,9 @@ const chartSeries = computed(() => {
   
   // Primary Axis (Index 0) - Weight
   const weightData = sessionStore.getChartSeriesForExercise(selectedEx, filters.value.rmType, filters.value.year, filters.value.month);
+
+  // Primary Axis (Index 0) - Body Weight
+  const bodyWeightData = sessionStore.getChartSeriesForBodyWeight(filters.value.year, filters.value.month);
   
   // Secondary Axis (Index 1) - Body Fat 
   const bodyFatData = sessionStore.getChartSeriesForBodyFat(filters.value.year, filters.value.month);
@@ -54,6 +57,15 @@ const chartSeries = computed(() => {
       data: weightData,
       yAxis: 0,
       marker: { enabled: true, radius: 4 }
+    },
+    {
+      name: 'Body Weight',
+      type: 'spline',
+      color: '#64748b', // Slate for secondary context
+      data: bodyWeightData,
+      yAxis: 0,
+      dashStyle: 'Dot',
+      marker: { enabled: false }
     },
     {
       name: 'Body Fat %',
@@ -278,6 +290,7 @@ onMounted(() => {
   margin: 0;
   letter-spacing: -0.5px;
   background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

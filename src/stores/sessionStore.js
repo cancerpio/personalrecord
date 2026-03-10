@@ -57,7 +57,7 @@ export const useSessionStore = defineStore('session', {
 
         // Transforms Body Fat data into [timestamp, fatPercentage] format for Highcharts secondary axis
         getChartSeriesForBodyFat: (state) => (year = 'all', month = 'all') => {
-            let filtered = state.bodyMetrics;
+            let filtered = state.bodyMetrics.filter(s => s.fatPercentage !== undefined && s.fatPercentage !== null && s.fatPercentage !== '');
 
             if (year !== 'all') {
                 filtered = filtered.filter(s => parseInt(s.date.split('-')[0]) === year);
@@ -71,6 +71,27 @@ export const useSessionStore = defineStore('session', {
                 const timeParts = record.date.split('-');
                 const timestamp = Date.UTC(parseInt(timeParts[0]), parseInt(timeParts[1]) - 1, parseInt(timeParts[2]));
                 return [timestamp, record.fatPercentage];
+            }).sort((a, b) => a[0] - b[0]);
+
+            return chartData;
+        },
+
+        // Transforms Body Weight data into [timestamp, bodyWeight] format for Highcharts primary axis
+        getChartSeriesForBodyWeight: (state) => (year = 'all', month = 'all') => {
+            let filtered = state.bodyMetrics.filter(s => s.bodyWeight !== undefined && s.bodyWeight !== null && s.bodyWeight !== '');
+
+            if (year !== 'all') {
+                filtered = filtered.filter(s => parseInt(s.date.split('-')[0]) === year);
+            }
+            if (month !== 'all') {
+                filtered = filtered.filter(s => parseInt(s.date.split('-')[1]) === month);
+            }
+
+            // Convert to Highcharts tuple [timestamp, value] sorted by time
+            const chartData = filtered.map(record => {
+                const timeParts = record.date.split('-');
+                const timestamp = Date.UTC(parseInt(timeParts[0]), parseInt(timeParts[1]) - 1, parseInt(timeParts[2]));
+                return [timestamp, Number(record.bodyWeight)];
             }).sort((a, b) => a[0] - b[0]);
 
             return chartData;
