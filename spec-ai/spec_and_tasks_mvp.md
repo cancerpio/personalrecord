@@ -26,6 +26,18 @@
 *   **後端架構與 API 端點**: 已實作為 Express + TypeScript 於 `backend/src/index.ts`。所有 `/api/v1/*` 端點及 LINE 驗證 Middleware 皆在此處。
 *   **資料庫 Schema 與部署**: Firestore 資料表設計請見 `spec-backend-mvp.md` 第 5 節；從 In-Memory 轉換至真實 Firebase Cloud Functions 的操作請見 `spec-ai/firebase-deploy.md`。
 
+### 1.4 開發與部屬期間的全端運作與串接藍圖
+儘管前端 WebApp 與後端 API 被放置在同一個專案資料夾 (Monorepo 風格) 下，但它們在執行與部屬時，實質上是兩個獨立的心臟（行程）：
+1. **本地開發與除錯 (Local Development)**：
+   - 需開啟**兩個終端機 (Terminal)**。
+   - 第一個跑 `npm run dev` 啟動前端 Vue WebApp (通常在 `localhost:5173`)。
+   - 第二個在 `backend/` 目錄跑 `npm run dev` 啟動 Node.js/Express API Server (在 `localhost:3001`)。
+   - 前端發送請求至 `http://localhost:3001/api/v1/...`，後端接收到請求後，透過 `firebase-admin` SDK 將資料非同步寫入 Google Cloud 的 Firestore 中。
+2. **正式上線部屬 (Production Deployment)**：
+   - 前端 WebApp：執行 `npm run build` 打包成靜態網頁後，由 GitHub Actions 部署至 **GitHub Pages**。
+   - 後端 API：透過 `firebase deploy --only functions`，將 Node.js Express 伺服器部署至 **Firebase Cloud Functions**。(網址將從 localhost 變成 `https://asia-east1-personalrecord...`)。
+   - 最終，部署在 GitHub Pages 的前端會設定環境變數 `VITE_API_BASE_URL`，無縫呼叫部署在 Cloud Functions 的 API，達成全球可擴縮的 Serverless 架構。
+
 ---
 
 ## 2. 功能實作藍圖 (Implementation Playbooks)
@@ -78,11 +90,11 @@
     - 兩種 Storage Service 必須實作一模一樣的 Interface。
     - UI 層 (`DashboardView`, `ProgramView`) 嚴禁直接呼叫 API 或 localStorage，所有資料存取皆需經過 `sessionStore`。
 *   **AI Execution Tasks**:
-    - [ ] Task 4.1: 建立統一的 Record Schema 與 `.env` 設定。
-    - [ ] Task 4.2: 實作 `api.js` (Repository Factory) 與 `LocalService` 底層實作。
-    - [ ] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
-    - [ ] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
-    - [ ] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
+    - [x] Task 4.1: 建立統一的 Record Schema 與 `.env` 設定。
+    - [x] Task 4.2: 實作 `api.js` (Repository Factory) 與 `LocalService` 底層實作與 `LIFFService` 遠端對接。
+    - [x] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
+    - [x] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
+    - [x] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
 
 ### Feature 6: Ultimate Hub Architecture (Record & Settings)
 *   **User Behavior**:
@@ -151,3 +163,27 @@
     - [x] (已完成) Task 9.2: 修改 `SettingsView.vue` 實作 Theme Toggle UI 並綁定設定。
     - [x] (已完成) Task 9.3: 於 `App.vue` 實作掛載時的 Theme Injector。
     - [x] (已完成) Task 9.4: 全面清洗圖表、導航列、標題漸層色碼，替換為 `--text-primary` 與 `--glass-border` 等動態變量。
+
+### Feature 10: Backend REST API Architecture & Cloud Integration
+*   **User Behavior**: 使用者無感知。提供穩定、跨平台的資料存取、LINE 身分驗證與推播基礎設施。
+*   **Backend Implementation**: 
+    - 使用 Express.js + TypeScript 建立 API 伺服器 (`backend/src/index.ts`)。
+    - 完全抽離 Firebase Client SDK，擁抱標準 REST API。
+    - 啟動內建 `mockDb` 作為 In-Memory 儲存，供開發期除錯。
+    - 實作 LINE `IDToken` 認證 Middleware，確保資料存取與身分安全。
+    - 提供未來部署至 Firebase Cloud Functions 並轉換為 `firebase-admin/firestore` 的完整指南 (`spec-ai/firebase-deploy.md`)。
+*   **REST API Endpoints**:
+    - `POST /api/v1/sessions`: 新增訓練紀錄
+    - `GET /api/v1/sessions`: 讀取該使用者的所有訓練紀錄
+    - `PUT /api/v1/sessions/:id`: 更新單筆訓練紀錄
+    - `DELETE /api/v1/sessions/:id`: 刪除單筆訓練紀錄
+    - `POST /api/v1/body-metrics`: 新增/覆寫當日體脂體重 (Upsert)
+    - `GET /api/v1/body-metrics`: 讀取該使用者的所有體脂體重紀錄
+    - `DELETE /api/v1/body-metrics/:date`: 刪除指定日期的體脂紀錄
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 10.1: 初始化 `backend` 目錄 (Node.js & TypeScript, Express + CORS + Body Parser)。
+    - [x] (已完成) Task 10.2: 建立 In-Memory Mock Database 與資料表結構 (設計文件：`spec-backend-mvp.md`)。
+    - [x] (已完成) Task 10.3: 實作跨來源與 LINE JWT 的認證 Middleware (`mockLiffAuth`)。
+    - [x] (已完成) Task 10.4: 開發並測試 Training Records CRUD API。
+    - [x] (已完成) Task 10.5: 開發並測試 Body Metrics CRUD (含 Upsert 防呆) API。
+    - [x] (已完成) Task 10.6: 撰寫 `spec-ai/firebase-deploy.md` 雲端遷移手冊。

@@ -44,71 +44,53 @@
    
    > 💡 這步驟做完後，你的 `backend` 裡面會多出 `firebase.json` 與 `.firebaserc`。
 
-2. **安裝 Firebase Admin SDK**：
-   這是讓我們的 Node.js 有權限以最高權限 (Admin) 寫入 Firestore 的套件。
-   ```bash
-   npm install firebase-admin firebase-functions
-   ```
+2. **刪除冗餘資料夾與修改設定檔 (已由 AI 完成此步驟)**：
+   - Firebase 預設會在 `backend/` 下方再建立一個 `functions/` 結構，這會導致雙層 `package.json` 難以管理。
+   - 我們選擇刪除該空的 `functions/` 資料夾，並開啟根目錄的 `firebase.json`，將 `source: "functions"` 改為 `source: "."`。
+   - 同時在 `package.json` 加入 `"build": "tsc"` 和 `"main": "dist/index.js"`，讓 Firebase 能在部署前自動編譯 TypeScript 程式碼。
 
-3. **修改 `src/index.ts` 進行匯出**：
+3. **匯出 Express 供雲端呼叫 (已由 AI 完成此步驟)**：
    打開 `backend/src/index.ts`，滑到**最下面**。把原本的 `app.listen(PORT, ...)` 取代成 Firebase 的匯出格式：
 
    ```typescript
-   // 原本的程式碼：
-   // const PORT = process.env.PORT || 3001;
-   // app.listen(PORT, () => { console.log(...) });
+   // 供本地開發使用的傾聽者
+   if (process.env.NODE_ENV !== 'production' && !process.env.FUNCTIONS_EMULATOR) {
+       app.listen(PORT, () => { console.log(...) });
+   }
 
-   // 修改為 Firebase Functions 的匯出格式：
-   import * as functions from "firebase-functions";
-   
-   // 告訴 Firebase，所有發送到 api 這個 function 的請求，都交由 Express (app) 處理
+   // 供 Firebase Cloud Functions 呼叫的匯出端點
+   import * as functions from "firebase-functions/v1";
    export const api = functions.region('asia-east1').https.onRequest(app);
    ```
 
 ---
 
-## 第三部分：抽換 In-Memory DB 改為真實的 Firestore
+## 第三部分：本機開發與真實資料庫串接測試 (Local Development)
 
-你問到：「*現在的 In-Memory DB 是怎麼做的？重新 deploy 就會消失嗎？*」
-**沒錯，完全正確！**
-目前的 `mockDb.ts` 裡面只是宣告了 `const users = new Map();`。這意味著資料是存在 Node.js 這個行程（Process）的記憶體裡。一旦伺服器關閉 (Ctrl+C) 或重新啟動，記憶體被釋放，資料就全部歸零了。
+如果每次寫扣都要 `firebase deploy` 等一分鐘才能測，效率會太低。因此我們提供了在本機 `localhost:3001` 就能直接對雲端 Firestore 讀寫的作法。
 
-### 🚨 轉換步驟 (手動作業)：
-為了持久化，我們需要把 `mockDb.ts` 的內容徹底換成調用 Firestore SDK。
+1. **取得服務帳戶金鑰 (Service Account Key)**：
+   - 到 Firebase Console > 專案設定 (齒輪圖示) > 服務帳戶 (Service Accounts)。
+   - 點擊「**產生新的私密金鑰 (Generate new private key)**」。
+   - 它會下載一個包含超高權限的 JSON 檔案。
 
-1. **初始化 Admin SDK**
-   在 `backend/src/mockDb.ts` (你可以改名為 `db.ts`) 的最上方加入：
-   ```typescript
-   import * as admin from 'firebase-admin';
+2. **放置金鑰與設定環境變數**：
+   - 把這個 JSON 檔案拉進 `backend/` 資料夾，並更名為 `serviceAccountKey.json`。
+   - **(安全警告)**：請確保 `.gitignore` 裡面有寫入 `serviceAccountKey.json`，**絕對不可以推上 GitHub**。
+   - 在 Terminal 中 (需於 `backend/` 下)，透過匯出環境變數讓 Node.js 吃這個金鑰：
+     ```bash
+     export GOOGLE_APPLICATION_CREDENTIALS="./serviceAccountKey.json"
+     npm run dev
+     ```
 
-   // 初始化 Admin SDK (部署到 Cloud Functions 時不需要金鑰，它會自動抓環境的最高權限)
-   admin.initializeApp();
-   const db = admin.firestore();
-   ```
-
-2. **改寫 CRUD 函數 (範例：AddSession)**
-   原本的陣列推入 (`this.sessions.set()`) 會變成非同步的資料庫存取：
-   ```typescript
-   async addSession(userId: string, data: any) {
-     const now = admin.firestore.FieldValue.serverTimestamp();
-     const sessionRef = db.collection('training_sessions').doc(); // 自動產生 ID
-     
-     const newRecord = {
-       ...data,
-       userId,
-       createdAt: now,
-       updatedAt: now
-     };
-     
-     await sessionRef.set(newRecord);
-     return { docId: sessionRef.id, ...newRecord };
-   }
-   ```
-   > 備註：這個過程需要將所有方法 (getSessions, addSession, 等等) 改寫成 `async/await`，且前端接收到資料的時間格式可能會變成 Firestore 的 Timestamp 物件，需做格式化對齊。
+3. **前端呼叫測試**：
+   - 到專案根目錄的前端 `.env` 中，確認 `VITE_STORAGE_MODE=liff`，以及 `VITE_API_BASE_URL=http://localhost:3001/api/v1`。
+   - 此時你在前端操作網頁存一筆新的「深蹲重量」，資料就會透過本機伺服器直達遠端資料庫。
+   - (註：這部分已由 AI 全面實作為 TypeScript 的 Async/Await 搭配 `firebase-admin` 模組)。
 
 ---
 
-## 第四部分：部署上線 (Deploy to Cloud)
+## 第四部分：部署上線 (Deploy to Cloud Functions)
 
 當你把程式碼都改好，且在 Terminal 用 `npm run build` (tsc 編譯 TypeScript) 沒有報錯後，就可以發射上雲端了：
 
