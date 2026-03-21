@@ -19,10 +19,16 @@
     *   **雙層級儀表板**: 廣度預覽 (Sparklines) + 深度分析 (Hero section dual-axis chart)。
     *   **LINE Mini App 導覽限制 (Constraint)**: 由於 LIFF 環境缺乏原生瀏覽器導覽列，系統必須實作專屬的 **Bottom Tab Bar** (供主要模組切換) 以及 **自製 Top Navbar** (附帶 `< 返回` 按鈕供子頁面使用)，避免使用者迷失。
 
-### 1.3 架構與儲存模式 (API Client)
-全面採用 RESTful API 架構，前端透過 `VITE_STORAGE_MODE` 切換實作：
-1.  **`local`**: 不發 HTTP Request，純 `localStorage` 存取。
-2.  **`liff`**: 呼叫遠端 API，使用 LINE `liff.getIDToken()` 進行 JWT 驗證 (`Bearer <IDToken>`)。
+### 1.3 架構與儲存模式 (API Client) 暨環境變數雙維度切換
+全面採用 RESTful API 架構。為兼顧「純前端單機 Demo」、「本地全端 API 開發」與「正式上線」三種情境，設計了以下環境變數切換機制：
+
+1. **資料層總樞紐：`VITE_STORAGE_MODE`**
+   - `'local'`: 不發送任何 HTTP 網路請求，所有動作只透過 `LocalService.js` 在瀏覽器端的 `localStorage` 讀寫。適合無依賴連線的純 UI 展示。
+   - `'liff'`: 啟動 `LIFFService.js`，開始發動 `fetch` HTTP 請求給後端 API 伺服器。
+
+2. **登入驗證實體開關：`VITE_MOCK_LIFF_TOKEN`**（僅在 `VITE_STORAGE_MODE=liff` 時生效）
+   - `'true'`: 為了讓開發者在電腦上測試「前端打後端 API + 操作 Firestore」時不被強制跳出 LINE 登入畫面卡死，跳過真實的 LINE SDK (`liff.init()`)，直接將發送出去的 HTTP Request 挾帶一組假 Token 打向開發區的後端 Server。這極大化升級了全端整合的開發體驗。
+   - `'false'` 或未設定：打向真正的上線版 API 時，呼叫原生的 `liff.getIDToken()` 獲取真實 JWT 並作為通關信物。
 *   **後端架構與 API 端點**: 已實作為 Express + TypeScript 於 `backend/src/index.ts`。所有 `/api/v1/*` 端點及 LINE 驗證 Middleware 皆在此處。
 *   **資料庫 Schema 與部署**: Firestore 資料表設計請見 `spec-backend-mvp.md` 第 5 節；從 In-Memory 轉換至真實 Firebase Cloud Functions 的操作請見 `spec-ai/firebase-deploy.md`。
 
@@ -95,6 +101,7 @@
     - [x] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
     - [x] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
     - [x] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
+    - [ ] **Task 4.6 (Pending)**: 正式引入 LINE SDK (`@line/liff`)，並將 `LIFFService.js` 裡的假 Token 替換為真實的 `await liff.init()` 與 `liff.getIDToken()`。（*架構備註：需新增環境變數如 `VITE_MOCK_LIFF_TOKEN=true`，讓開發者在本地端切換為 `liff` 儲存模式測試後端 API 時，能選擇跳過真實的 LINE 登入流程，直接打假 Token 給後端*）。
 
 ### Feature 6: Ultimate Hub Architecture (Record & Settings)
 *   **User Behavior**:
@@ -187,3 +194,4 @@
     - [x] (已完成) Task 10.4: 開發並測試 Training Records CRUD API。
     - [x] (已完成) Task 10.5: 開發並測試 Body Metrics CRUD (含 Upsert 防呆) API。
     - [x] (已完成) Task 10.6: 撰寫 `spec-ai/firebase-deploy.md` 雲端遷移手冊。
+    - [ ] **Task 10.7 (Pending)**: 依據後端環境變數 (如 `process.env.MOCK_LIFF_TOKEN=true`) 切換 `mockLiffAuth` 的核心邏輯。正式環境必須使用 `jsonwebtoken` 或要求 LINE 進行 JWT 驗證，並從 Payload 內的 `sub` 欄位取出真實的 `userId`，拒絕任何偽造的 `fake-liff-token` 請求。
