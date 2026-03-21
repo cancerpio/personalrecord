@@ -175,3 +175,31 @@ const openaiKey = defineSecret("OPENAI_API_KEY");
 // 在 API 被呼叫的當下才提取：
 const key = openaiKey.value(); 
 ```
+
+---
+
+## 附錄：給 MongoDB 開發者的 Firestore 避坑指南
+
+如果團隊成員曾熟悉 MongoDB 等傳統 Document DB，剛接觸 Firestore 時可能會遭遇思維落差。請務必閱讀以下三大轉彎：
+
+### 1. 查詢語法的差異 (連綴 V.S. 巢狀 JSON)
+*   **MongoDB** 習慣在一個 JSON 物件網內寫完條件：`db.users.find({ age: { $gt: 20 }, status: "A" })`。
+*   **Firestore** 則採用 SQL 風格的連綴 (Chaining) 語句，查詢上更為直覺，但缺乏正規表達式 (Regex) 等超複雜條件支援：
+    `db.collection('users').where('age', '>', 20).where('status', '==', 'A').get()`
+
+### 2. 「交錯樹狀層級」與「淺層讀取 (Shallow Query)」
+*   **MongoDB** 中的 Subdocument 往往就是一個巨大的巢狀 Array，抓取時會把幾萬筆歷史紀錄「一次整包拖出來」，極耗效能。
+*   **Firestore** 規定資料必須是精準的 `Collection -> Document -> Collection -> Document...` 的交錯樹狀結構。
+    最重要的是，Firestore 的讀取是**極度的淺層查詢**。抓出某個 User Document，它底下的 `training_sessions` (次級 Collection) 資料**完全不會被抓出來**。不管資料庫有十筆還是一億筆，淺層撈取的時間永遠恆常極速。
+
+### 3. 禁止 Server-Side Join，用「降正規化 (Denormalization)」換取速度
+*   **MongoDB** 有非常暴力的 `Aggregate Pipeline` 可以在伺服器端算清各種 JOIN (`$lookup`) 和大數據加總。
+*   **Firestore** 刻意**拔掉了幾乎所有動態運算能力** (沒有 $lookup、無法多表聯集)。
+    *   **核心思維**：不要因為「偷懶不重複寫入資料」，而指望在讀取時用 SQL 把它們 Join 在一起算半天。
+    *   **Firestore 思維 (空間換時間)**：如果是前端「深蹲總次數」這種需要加總的畫面，我們不該寫一個查詢把 100 筆深蹲拉出來加總；而是要在每次使用者發出深蹲「寫入」請求時，**直接去更新一個叫做 `total_reps` 的寫死計數數字**。
+    *   **結果**：每次讀取畫面只需「O(1) 的極速代價」，因為那只是去讀一個已經算好且寫死的數字欄位。這讓 Firestore 具備了世界級的無限並發與橫向擴充極限。
+
+### 4. 真正「零設定 (Schema-less)」，把關責任交還給應用層 (TypeScript)
+*   **傳統關聯表 / ORM**：開發前必須先在資料庫端下 `CREATE TABLE`，或透過腳本跑 DB Migration 把欄位定死。
+*   **Firestore**：你在雲端 Console 大廳**完全不需要手動建立任何檔案櫃**！當後端的程式碼第一手塞入 JSON 的瞬間 (`db.collection('sessions').set(..)`），只要有寫入動作，Firestore 就敢直接無中生有幫你把資料夾跟層級全建好。
+    *   **設計哲學（重要！）**：沒有 Schema 束縛不代表可以亂塞垃圾。我們將防呆的保護網從「資料庫層」全數上移到了「**應用層 (Node.js)**」。請務必透過 `backend/src/db.ts` 中的 **TypeScript 介面 (Interface)** 來強制定義所有型別；只要 TypeScript 編譯能過，資料庫就不會弄髒。
