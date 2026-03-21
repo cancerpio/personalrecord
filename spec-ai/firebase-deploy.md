@@ -107,3 +107,71 @@ VITE_API_BASE_URL=https://asia-east1-personalrecord-xxx.cloudfunctions.net/api/v
 ```
 
 **恭喜！你的 Personal Record 正式成為一款具備 Serverless 後端、無上限資料庫擴充性，而且永不消失的雲端全端 App 了！**
+
+---
+
+## 第五部分：全端環境變數 (Environment Variables) 設定
+
+專案正式上線時，我們的架構將敏感的環境變數交由 `.env` 檔案管理，且設定為 `.gitignore` 不上傳至版控。為了讓部署上去的前端與雲端後端都能吃到對的參數，請依據以下步驟設定：
+
+### 5.1 前端 (Frontend - 部署至 GitHub Pages)
+
+因為 GitHub Actions 電腦在執行打包 (`npm run build`) 時抓不到你電腦裡的 `.env`，必須進行以下兩步操作：
+
+**步驟 A：修改 GitHub Actions Workflow 腳本**
+於專案 `.github/workflows/deploy.yml` 的 `Build` 步驟中，手動注入由 GitHub 後台讀取的變數：
+```yaml
+      - name: Build
+        env:
+          VITE_STORAGE_MODE: ${{ vars.VITE_STORAGE_MODE }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: npm run build
+```
+
+**步驟 B：於 GitHub 後台新增 Variables**
+請進入 GitHub 專案 ➡️ **Settings** ➡️ 左側 **Secrets and variables** ➡️ **Actions** ➡️ 點擊上方 **Variables** 分頁標籤 ➡️ 點擊綠色按鈕 `New repository variable` 建立以下兩把鑰匙：
+*   **Name**: `VITE_STORAGE_MODE`, **Value**: `liff`
+*   **Name**: `VITE_API_BASE_URL`, **Value**: `https://asia-east1-personalrecord-xxx.cloudfunctions.net/api/v1` (替換為你的 Firebase 網址)
+
+最後只要執行 `git push`，打包精靈就會自動燒錄這些變數並發佈網頁。
+
+---
+
+### 5.2 後端 (Backend - 部署至 Firebase Cloud Functions)
+
+後端的環境變數控制著安全邏輯（例如 `Task 10.7` 提到的 `MOCK_LIFF_TOKEN`）。
+Firebase CLI (版本 > 10.0) 已經原生支援讀取 `.env`。所以設定方式非常直覺：
+
+**步驟 A：在 `backend/` 建立 `.env` 檔案**
+在你的 `/backend` 資料夾下，新增一個名為 `.env` 的純文字檔，寫入你想要的正式環境設定：
+```env
+# 控制是否要在雲端打假 Token 通關，正式上線應設定為 false 或乾脆不要寫這行
+MOCK_LIFF_TOKEN=false
+```
+
+**步驟 B：直接 Deploy**
+當你執行 `firebase deploy --only functions` 的時候，Firebase CLI 會自動抓取 `backend/.env` 裡面的參數，將它們挾帶上雲端，直接變成該 Cloud Function 專屬的環境變數。完全不需要去 Google Cloud 後台手動點擊介面！
+
+---
+
+### 5.3 企業級高機密變數設定 (Google Cloud Secret Manager)
+
+對於普通變數如 `MOCK_LIFF_TOKEN=false`，寫入 `.env` 並上傳是絕對安全的（因為外部使用者無法讀取後端程式碼）。
+**但若你的變數是極度機密的金鑰（例如：OpenAI API Key, Stripe 私鑰、資料庫 Root 密碼），為防止團隊成員設定 `.gitignore` 失誤而不小心將 `.env` 原始檔推上 GitHub 造成外洩，強烈建議使用原生支援的 Secret Manager：**
+
+**步驟 A：在終端機加密上傳**
+不要寫在文字檔裡，打開終端機 (進入 `backend/` 目錄) 直接輸入指令：
+```bash
+firebase functions:secrets:set OPENAI_API_KEY
+```
+此時系統會請你輸入密碼（輸入時螢幕不顯示）。輸入完成後，這把金鑰會直接被鎖進 Google 的金庫中，你的電腦硬碟不會留下任何痕跡。
+
+**步驟 B：於程式碼中安全讀取**
+在雲端環境啟動時，再透過 `firebase-functions/params` 模組將金鑰提取出來用：
+```typescript
+import { defineSecret } from "firebase-functions/params";
+const openaiKey = defineSecret("OPENAI_API_KEY");
+
+// 在 API 被呼叫的當下才提取：
+const key = openaiKey.value(); 
+```
