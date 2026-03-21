@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { mockDb } from './mockDb';
+import { firestoreDb as db } from './db';
+import * as functions from 'firebase-functions/v1';
 
 const app = express();
 app.use(cors());
@@ -18,8 +19,7 @@ declare global {
 }
 
 // 模擬的 LIFF 驗證 Middleware
-// 真正的實作會使用 `jsonwebtoken` 或 LINE SDK 驗證 `req.headers.authorization` 裡的 IDToken 並解析出 `sub`
-const mockLiffAuth = (req: Request, res: Response, next: NextFunction) => {
+const mockLiffAuth = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
@@ -33,87 +33,126 @@ const mockLiffAuth = (req: Request, res: Response, next: NextFunction) => {
 
     req.user = { userId };
 
-    // 自動 Upsert User 資料供模擬
-    mockDb.upsertUser(userId, { displayName: `User ${userId}` });
-
-    next();
+    try {
+        // 自動 Upsert User 資料供模擬
+        await db.upsertUser(userId, { displayName: `User ${userId}` });
+        next();
+    } catch (e) {
+        console.error("Auth Error", e);
+        next(e);
+    }
 };
 
-app.use('/api/v1', mockLiffAuth);
+app.use('/api/v1', mockLiffAuth as any);
 
 // --- API Endpoints ---
 
 // 1. Training Sessions
-app.get('/api/v1/sessions', (req, res) => {
-    const userId = req.user!.userId;
-    const sessions = mockDb.getSessions(userId);
-    res.json({ data: sessions });
-});
-
-app.post('/api/v1/sessions', (req, res) => {
-    const userId = req.user!.userId;
-    const data = req.body;
-    const newSession = mockDb.addSession(userId, data);
-    res.status(201).json({ data: newSession });
-});
-
-app.put('/api/v1/sessions/:id', (req, res) => {
-    const userId = req.user!.userId;
-    const docId = req.params.id;
-    const data = req.body;
-    const updated = mockDb.updateSession(userId, docId, data);
-    if (!updated) {
-        return res.status(404).json({ error: 'Session not found or unauthorized' });
+app.get('/api/v1/sessions', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const sessions = await db.getSessions(userId);
+        res.json({ data: sessions });
+    } catch (e) {
+        next(e);
     }
-    res.json({ data: updated });
 });
 
-app.delete('/api/v1/sessions/:id', (req, res) => {
-    const userId = req.user!.userId;
-    const docId = req.params.id;
-    const success = mockDb.deleteSession(userId, docId);
-    if (!success) {
-        return res.status(404).json({ error: 'Session not found or unauthorized' });
+app.post('/api/v1/sessions', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const data = req.body;
+        const newSession = await db.addSession(userId, data);
+        res.status(201).json({ data: newSession });
+    } catch (e) {
+        next(e);
     }
-    res.status(204).send();
+});
+
+app.put('/api/v1/sessions/:id', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const docId = req.params.id;
+        const data = req.body;
+        const updated = await db.updateSession(userId, docId, data);
+        if (!updated) {
+            return res.status(404).json({ error: 'Session not found or unauthorized' });
+        }
+        res.json({ data: updated });
+    } catch (e) {
+        next(e);
+    }
+});
+
+app.delete('/api/v1/sessions/:id', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const docId = req.params.id;
+        const success = await db.deleteSession(userId, docId);
+        if (!success) {
+            return res.status(404).json({ error: 'Session not found or unauthorized' });
+        }
+        res.status(204).send();
+    } catch (e) {
+        next(e);
+    }
 });
 
 // 2. Body Metrics
-app.get('/api/v1/body-metrics', (req, res) => {
-    const userId = req.user!.userId;
-    const metrics = mockDb.getBodyMetrics(userId);
-    res.json({ data: metrics });
+app.get('/api/v1/body-metrics', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const metrics = await db.getBodyMetrics(userId);
+        res.json({ data: metrics });
+    } catch (e) {
+        next(e);
+    }
 });
 
-app.post('/api/v1/body-metrics', (req, res) => {
-    const userId = req.user!.userId;
-    const { date, fatPercentage, bodyWeight } = req.body;
+app.post('/api/v1/body-metrics', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const { date, fatPercentage, bodyWeight } = req.body;
 
-    if (!date) {
-        return res.status(400).json({ error: 'Date is required' });
+        if (!date) {
+            return res.status(400).json({ error: 'Date is required' });
+        }
+
+        const updated = await db.upsertBodyMetric(userId, date, { fatPercentage, bodyWeight });
+        res.status(200).json({ data: updated });
+    } catch (e) {
+        next(e);
     }
-
-    const updated = mockDb.upsertBodyMetric(userId, date, { fatPercentage, bodyWeight });
-    res.status(200).json({ data: updated });
 });
 
-app.delete('/api/v1/body-metrics/:date', (req, res) => {
-    const userId = req.user!.userId;
-    const date = req.params.date;
-    const success = mockDb.deleteBodyMetric(userId, date);
-    if (!success) {
-        return res.status(404).json({ error: 'Metric not found or unauthorized' });
+app.delete('/api/v1/body-metrics/:date', async (req, res, next) => {
+    try {
+        const userId = req.user!.userId;
+        const date = req.params.date;
+        const success = await db.deleteBodyMetric(userId, date);
+        if (!success) {
+            return res.status(404).json({ error: 'Metric not found or unauthorized' });
+        }
+        res.status(204).send();
+    } catch (e) {
+        next(e);
     }
-    res.status(204).send();
 });
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error(err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+// --- Execution & Deployment Mode ---
+// For Local Development (only active if not running inside Firebase Functions emulator)
+if (process.env.NODE_ENV !== 'production' && !process.env.FUNCTIONS_EMULATOR) {
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+    });
+}
+
+// For Firebase Cloud Functions
+export const api = functions.region('asia-east1').https.onRequest(app);
