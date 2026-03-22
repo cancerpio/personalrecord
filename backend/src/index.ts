@@ -43,12 +43,14 @@ const mockLiffAuth = async (req: Request, res: Response, next: NextFunction) => 
     }
 };
 
-app.use('/api/v1', mockLiffAuth as any);
+const v1Router = express.Router();
+
+v1Router.use(mockLiffAuth as any);
 
 // --- API Endpoints ---
 
 // 1. Training Sessions
-app.get('/api/v1/sessions', async (req, res, next) => {
+v1Router.get('/sessions', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const sessions = await db.getSessions(userId);
@@ -58,7 +60,7 @@ app.get('/api/v1/sessions', async (req, res, next) => {
     }
 });
 
-app.post('/api/v1/sessions', async (req, res, next) => {
+v1Router.post('/sessions', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const data = req.body;
@@ -69,7 +71,7 @@ app.post('/api/v1/sessions', async (req, res, next) => {
     }
 });
 
-app.put('/api/v1/sessions/:id', async (req, res, next) => {
+v1Router.put('/sessions/:id', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const docId = req.params.id;
@@ -84,7 +86,7 @@ app.put('/api/v1/sessions/:id', async (req, res, next) => {
     }
 });
 
-app.delete('/api/v1/sessions/:id', async (req, res, next) => {
+v1Router.delete('/sessions/:id', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const docId = req.params.id;
@@ -99,7 +101,7 @@ app.delete('/api/v1/sessions/:id', async (req, res, next) => {
 });
 
 // 2. Body Metrics
-app.get('/api/v1/body-metrics', async (req, res, next) => {
+v1Router.get('/body-metrics', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const metrics = await db.getBodyMetrics(userId);
@@ -109,7 +111,7 @@ app.get('/api/v1/body-metrics', async (req, res, next) => {
     }
 });
 
-app.post('/api/v1/body-metrics', async (req, res, next) => {
+v1Router.post('/body-metrics', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const { date, fatPercentage, bodyWeight } = req.body;
@@ -125,7 +127,7 @@ app.post('/api/v1/body-metrics', async (req, res, next) => {
     }
 });
 
-app.delete('/api/v1/body-metrics/:date', async (req, res, next) => {
+v1Router.delete('/body-metrics/:date', async (req, res, next) => {
     try {
         const userId = req.user!.userId;
         const date = req.params.date;
@@ -138,6 +140,12 @@ app.delete('/api/v1/body-metrics/:date', async (req, res, next) => {
         next(e);
     }
 });
+
+// Mount the router twice to solve the Firebase Routing mismatch
+// Local environment -> Hits /api/v1/sessions
+app.use('/api/v1', v1Router);
+// Firebase Cloud Functions -> Strips the function name `/api`, hits /v1/sessions
+app.use('/v1', v1Router);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

@@ -63,6 +63,25 @@
    export const api = functions.region('asia-east1').https.onRequest(app);
    ```
 
+4. **解決 Firebase 強制拔除網址前綴的 404 陷阱 (雙掛載 Router)**：
+   - **痛點原因**：當雲端函式名稱被定義為 `api` (`exports.api = ...`) 時，其實際網址會是 `https://.../api/v1/sessions`。
+   - **雙重宇宙的底層架構差異 (API Gateway / Reverse Proxy)**：
+     - **情境 A (本機直連)**：本機開發時 `http://localhost:3001` 是直接對著 Express 的大門開火。因為沒有總機擋在前面，Express 收到的第一手原始路徑就是一字不漏的 `/api/v1/sessions`。
+     - **情境 B (雲端總機)**：部署上雲端後，最外層有一道防護網叫 **Google Cloud API Gateway (總機)**。總機收到 `https://.../api/v1/sessions` 後，它說：「喔，這要交給叫作 `api` 的雲端函式」。因此，總機會**強制把門牌 `/api` 扒下來**，只把剩下的文件 `/v1/sessions` 塞進房門給 Express。
+   - **錯誤情形**：這導致同樣一套程式碼，若你在本機寫死 `app.get('/api/v1/sessions')`，上雲端後 Express 只收到 `/v1/sessions`，以為路由對不上，直接吐回無情的 **404 Not Found**。
+   - **解法實作 (已由 AI 完成)**：我們將所有 `/v1/` 底下的 API 改為註冊給一個獨立的 `v1Router`。最後在核心 App 上同時註冊「被閹割版」與「完整版」的路由：
+     ```typescript
+     const v1Router = express.Router();
+     v1Router.get('/sessions', ...);
+
+     // 給本地端 localhost 開發測試配對用，匹配: /api/v1/sessions
+     app.use('/api/v1', v1Router); 
+     
+     // 給真正上雲端 Firebase 後配對用，匹配: /v1/sessions
+     app.use('/v1', v1Router);
+     ```
+     這保證了不管在雲端或是本機，我們的資料都能精準無誤地導向前方的 Router 處理器。
+
 ---
 
 ## 第三部分：本機開發與真實資料庫串接測試 (Local Development)
