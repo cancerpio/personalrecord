@@ -114,6 +114,26 @@ VITE_API_BASE_URL=https://asia-east1-personalrecord-xxx.cloudfunctions.net/api/v
 
 專案正式上線時，我們的架構將敏感的環境變數交由 `.env` 檔案管理，且設定為 `.gitignore` 不上傳至版控。為了讓部署上去的前端與雲端後端都能吃到對的參數，請依據以下步驟設定：
 
+### 🎯 全端環境變數速查表 (Cheat Sheet)
+
+為方便後續維護，以下統整本專案從前端到後端**所有支援的環境變數**及其用途：
+
+#### 📍 前端 (設定於 `/.env` 或 GitHub Variables)
+| 變數名稱 | 允許值 / 範例 | 功能說明 | 必填 |
+| :--- | :--- | :--- | :--- |
+| **`VITE_STORAGE_MODE`** | `local` 或 `liff` | 將前端模式切換為「純離線 UI 版(`local`)」或「連線打 API 版(`liff`)」。 | ✅ |
+| **`VITE_API_BASE_URL`** | `http://localhost:3001/api/v1` | 後端 API 的根網址。如果模式為 `liff`，此為前端發送請求的網域。 | *(liff 模式必填)* |
+| **`VITE_MOCK_LIFF_TOKEN`** | `true` 或不設定 | 本機端開發專用：測試 `liff` 連線到後端時，是否要**跳過真實的 LINE 身分驗證**，直接塞一顆假 Token 給後端（用以獲得完美的除錯體驗）。 | ❌ |
+
+#### 📍 後端 (設定於 `/backend/.env` 或 Firebase Secrets)
+| 變數名稱 | 允許值 / 範例 | 功能說明 | 必填 |
+| :--- | :--- | :--- | :--- |
+| **`PORT`** | `3001` (預設) | 本機開發專用：Node.js Express 伺服器的啟動對接埠口 (部署雲端時 Firebase 會接管此變數)。 | ❌ |
+| **`GOOGLE_APPLICATION_CREDENTIALS`**| `./serviceAccountKey.json` | 本機開發專用：讓本機的 Node.js 能取得最高層級金鑰來存取真正的雲端 Firestore。(嚴禁推上 Git 版控) | *(本機連線版必填)* |
+| **`MOCK_LIFF_TOKEN`** | `true` 或 `false` | 控制後端 `mockLiffAuth` Middleware 是否要放行假字串。**正式上線環境務必設為 `false` 或不寫 (預設為 false)**，以防止前端偽造身分攻擊。 | ❌ |
+
+---
+
 ### 5.1 前端 (Frontend - 部署至 GitHub Pages)
 
 因為 GitHub Actions 電腦在執行打包 (`npm run build`) 時抓不到你電腦裡的 `.env`，必須進行以下兩步操作：

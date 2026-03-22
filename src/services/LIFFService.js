@@ -3,7 +3,17 @@ const MOCK_TOKEN = 'fake-liff-token'; // In a real LIFF app, this would be liff.
 
 export class LIFFService {
     async getHeaders() {
-        const token = MOCK_TOKEN;
+        let token;
+        
+        // 檢查環境變數：本地開發時若啟用 Mock，直接給假 Token
+        if (import.meta.env.VITE_MOCK_LIFF_TOKEN === 'true') {
+            token = 'fake-liff-token';
+        } else {
+            // TODO: (Task 4.6) 這裡等日後引入真實 `@line/liff` 後，替換為真正的 liff.getIDToken()
+            console.warn("Real LIFF authentication is pending (Task 4.6). Falling back to fake token.");
+            token = 'fake-liff-token'; 
+        }
+
         return {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
