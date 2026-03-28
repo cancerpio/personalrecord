@@ -1,10 +1,16 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopNavbar from './components/TopNavbar.vue';
+import { useLiffStore } from './stores/liffStore';
 
 const route = useRoute();
 const router = useRouter();
+const liffStore = useLiffStore();
+
+onMounted(() => {
+  liffStore.initLiff();
+});
 
 const currentPath = computed(() => {
   return route.path;

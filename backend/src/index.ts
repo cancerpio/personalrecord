@@ -18,34 +18,54 @@ declare global {
     }
 }
 
-// 模擬的 LIFF 驗證 Middleware
-const mockLiffAuth = async (req: Request, res: Response, next: NextFunction) => {
+import axios from 'axios';
+
+// 正式版的 LIFF 驗證 Middleware
+const liffAuthMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
     }
 
-    const token = authHeader.split(' ')[1] || 'fake-liff-token';
-
-    // 在這裡，因為是 mock 測試，我們假設前端開發階段傳來的 token 解析後能得出 userId="mock_user_123"
-    // 若你要用不同帳號測試，可以直接讓前端把 token 設定為想模擬的 userId，例如 Bearer my_test_id
-    const userId = token === 'fake-liff-token' ? 'U_mock_user_123' : token;
-
-    req.user = { userId };
+    const token = authHeader.split(' ')[1];
 
     try {
-        // 自動 Upsert User 資料供模擬
-        await db.upsertUser(userId, { displayName: `User ${userId}` });
+        let userId = '';
+        let userProfile: any = {};
+
+        // 開發端防呆切換：若啟用 MOCK 模式，則直接通關
+        if (process.env.MOCK_LIFF_TOKEN === 'true') {
+            userId = token === 'fake-liff-token' ? 'U_mock_user_123' : token;
+            userProfile = { displayName: `User ${userId}` };
+        } else {
+            // 正式安全連線：向 LINE 伺服器驗證 JWT Token 的真實性
+            const response = await axios.post('https://api.line.me/oauth2/v2.1/verify', new URLSearchParams({
+                id_token: token,
+                client_id: process.env.LINE_CLIENT_ID || '' // 【重要】後端 .env 必須填寫對應的 LINE Login Channel ID
+            }).toString(), {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            });
+
+            const payload: any = response.data;
+            userId = payload.sub; // LINE User ID
+            if (payload.name) userProfile.displayName = payload.name;
+            if (payload.picture) userProfile.pictureUrl = payload.picture;
+        }
+
+        req.user = { userId };
+
+        // 自動 Upsert 真實使用者的資訊到 Firestore Users 表
+        await db.upsertUser(userId, userProfile);
         next();
-    } catch (e) {
-        console.error("Auth Error", e);
-        next(e);
+    } catch (e: any) {
+        console.error("Auth Error:", e.response?.data || e.message);
+        return res.status(401).json({ error: 'Unauthorized: Token verification failed' });
     }
 };
 
 const v1Router = express.Router();
 
-v1Router.use(mockLiffAuth as any);
+v1Router.use(liffAuthMiddleware as any);
 
 // --- API Endpoints ---
 

@@ -1,5 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
-const MOCK_TOKEN = 'fake-liff-token'; // In a real LIFF app, this would be liff.getIDToken()
+import liff from '@line/liff';
+import { useLiffStore } from '../stores/liffStore';
 
 export class LIFFService {
     async getHeaders() {
@@ -9,9 +10,14 @@ export class LIFFService {
         if (import.meta.env.VITE_MOCK_LIFF_TOKEN === 'true') {
             token = 'fake-liff-token';
         } else {
-            // TODO: (Task 4.6) 這裡等日後引入真實 `@line/liff` 後，替換為真正的 liff.getIDToken()
-            console.warn("Real LIFF authentication is pending (Task 4.6). Falling back to fake token.");
-            token = 'fake-liff-token'; 
+            // Check if store initialized LIFF successfully
+            const store = useLiffStore();
+            if (!store.isInit) {
+                // Wait for init if called early
+                await store.initLiff(); 
+            }
+            token = liff.getIDToken();
+            if (!token) throw new Error("LIFF Token not found, user might not be logged in.");
         }
 
         return {
