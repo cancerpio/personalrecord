@@ -88,6 +88,18 @@
 
 ---
 
+## 🔥 踩坑避雷指南 (Troubleshooting)
+
+### 🚨 錯誤代碼：HTTP 400 Bad Request (`invalid authorization code`)
+- **發生情境**：在 LINE Mini App / 外部瀏覽器剛登入並跳轉回來時（網址帶有 `?code=xxx`），前端突然報錯 `LIFF initialization failed`。
+- **根本原因 (Vue Concurrency Race Condition)**：
+  當使用者打開 `#/dashboard` 時，`App.vue` 的 `onMounted` 鉤子與 `DashboardView.vue` 內的 API 呼叫（如 `api.getSessions()`）可能**同時並發 (Concurrent)** 執行。
+  這導致兩方同時判定「LIFF 尚未初始化」而向 LINE API 發送 `liff.init()`。跑最快的請求 A 會成功兌換網址上的 `code` 為 Token，但慢了 1 毫秒的請求 B 也拿著同一張 `code` 試圖兌換，進而遭到 LINE 總部退回 `HTTP 400 Bad Request`（認證碼已被使用）。
+- **解決方案 (Promise Lock)**：
+  在 Zustand / Pinia 狀態庫 (`src/stores/liffStore.js`) 中加入了一把 `_initPromise` 交換鎖。一旦第一支 Component 開始初始化，就將其 `Promise` 快取起來。後續千軍萬馬的高併發請求，都只會 `return this._initPromise` 安靜排隊等待結果，確保這張一次性的 `code` 絕對不會被重複擊發。
+
+---
+
 ## Code Review Feedback (請在這裡紀錄您的意見)
 
 *   [ ] Reviewer feedback 1: ...

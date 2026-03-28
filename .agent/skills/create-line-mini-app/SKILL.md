@@ -126,24 +126,38 @@ export const useLiffStore = defineStore('liff', {
   state: () => ({
     liffId: import.meta.env.VITE_LIFF_ID || '',
     isLoggedIn: false,
-    profile: null as any
+    profile: null as any,
+    _initPromise: null as Promise<void> | null // Promise lock for concurrency
   }),
   actions: {
     async init() {
-      if (!this.liffId) return;
-      try {
-        await liff.init({ liffId: this.liffId });
-        if (liff.isLoggedIn()) {
-          this.isLoggedIn = true;
-          this.profile = await liff.getProfile();
-        } else {
-             // For Mini App, auto login usually happens inside LINE
-             // For external browser, might need liff.login()
-             liff.login();
+      if (this.isLoggedIn) return;
+      
+      // Concurrency Lock: Prevent multiple components from calling liff.init() simultaneously
+      // This avoids the '400 Bad Request: invalid authorization code' error 
+      // when Vue components and Router hooks race each other on app load.
+      if (this._initPromise) return this._initPromise;
+
+      this._initPromise = (async () => {
+        if (!this.liffId) return;
+        try {
+          await liff.init({ liffId: this.liffId });
+          if (liff.isLoggedIn()) {
+            this.isLoggedIn = true;
+            this.profile = await liff.getProfile();
+          } else {
+               // For Mini App, auto login usually happens inside LINE
+               // For external browser, redirect to login
+               liff.login();
+          }
+        } catch (err) {
+          console.error('LIFF Init Failed', err);
+        } finally {
+          this._initPromise = null;
         }
-      } catch (err) {
-        console.error('LIFF Init Failed', err);
-      }
+      })();
+
+      return this._initPromise;
     }
   }
 });
