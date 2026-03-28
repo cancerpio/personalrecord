@@ -139,6 +139,7 @@ export const useLiffStore = defineStore('liff', {
         } else {
              // For Mini App, auto login usually happens inside LINE
              // For external browser, might need liff.login()
+             liff.login();
         }
       } catch (err) {
         console.error('LIFF Init Failed', err);
@@ -146,6 +147,63 @@ export const useLiffStore = defineStore('liff', {
     }
   }
 });
+```
+
+> **🔥 CRITICAL SECURITY & AUTHENTICATION NOTE FOR MINI APPS:**
+> LINE Mini App channels often do not have the `openid` scope granted by default (especially for unverified channels outside of Japan). Without `openid`, `liff.getIDToken()` will strictly return `null`.
+> **Solution:** Do NOT use `liff.getIDToken()`. Use **`liff.getAccessToken()`** instead.
+
+#### Authentication Implementation Code
+
+**1. Frontend API Service (`src/services/api.ts`)**
+```typescript
+import liff from '@line/liff';
+
+export const fetchWithLiff = async (endpoint: string, options: RequestInit = {}) => {
+  const token = liff.getAccessToken(); // Use Access Token!
+  if (!token) throw new Error("LIFF Access Token not found");
+
+  const headers = {
+    ...options.headers,
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+
+  return fetch(`/api/v1${endpoint}`, { ...options, headers });
+};
+```
+
+**2. Backend Express Middleware (`backend/src/middleware/liffAuth.ts`)**
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import axios from 'axios';
+
+export const liffAuthMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing token' });
+    }
+    const token = authHeader.split(' ')[1];
+
+    try {
+        // Step 1: Verify Channel ID to prevent token spoofing from other apps
+        const verifyRes = await axios.get(`https://api.line.me/oauth2/v2.1/verify?access_token=${token}`);
+        if (verifyRes.data.client_id !== process.env.LINE_CLIENT_ID) {
+            return res.status(401).json({ error: 'Channel ID mismatch' });
+        }
+
+        // Step 2: Extract real User Profile
+        const profileRes = await axios.get('https://api.line.me/v2/profile', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // Inject userId into request for downstream controllers
+        req.user = { userId: profileRes.data.userId };
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: 'Invalid LINE Access Token' });
+    }
+};
 ```
 
 ### Step 6: Design Custom Navigation UI (Critical Constraint)
