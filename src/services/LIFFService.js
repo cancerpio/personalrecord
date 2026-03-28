@@ -16,7 +16,7 @@ export class LIFFService {
                 // Wait for init if called early
                 await store.initLiff(); 
             }
-            token = liff.getIDToken();
+            token = liff.getAccessToken(); // Changed to getAccessToken to bypass openid scope requirement
             if (!token) {
                 console.error("=== LIFF Debug Diagnostics ===");
                 try { console.error("1. Is Logged In:", liff.isLoggedIn()); } catch(e) { console.error("1. Is Logged In Eval Error:", e.message); }

@@ -38,18 +38,22 @@ const liffAuthMiddleware = async (req: Request, res: Response, next: NextFunctio
             userId = token === 'fake-liff-token' ? 'U_mock_user_123' : token;
             userProfile = { displayName: `User ${userId}` };
         } else {
-            // 正式安全連線：向 LINE 伺服器驗證 JWT Token 的真實性
-            const response = await axios.post('https://api.line.me/oauth2/v2.1/verify', new URLSearchParams({
-                id_token: token,
-                client_id: process.env.LINE_CLIENT_ID || '' // 【重要】後端 .env 必須填寫對應的 LINE Login Channel ID
-            }).toString(), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            // 正式安全連線：向 LINE 伺服器驗證 Access Token 的真實性
+            // 1. 驗證 Token 是否真的屬於我們的 Channel ID (防駭客拿別台 App 的 Token 來騙)
+            const verifyTokenRes = await axios.get(`https://api.line.me/oauth2/v2.1/verify?access_token=${token}`);
+            if (verifyTokenRes.data.client_id !== process.env.LINE_CLIENT_ID) {
+                throw new Error("Invalid Channel ID mismatch. Token is not from our app.");
+            }
+
+            // 2. 獲取真實的 LINE User Profile 資訊
+            const response = await axios.get('https://api.line.me/v2/profile', {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             const payload: any = response.data;
-            userId = payload.sub; // LINE User ID
-            if (payload.name) userProfile.displayName = payload.name;
-            if (payload.picture) userProfile.pictureUrl = payload.picture;
+            userId = payload.userId; // LINE User ID (從 v2/profile 取出)
+            if (payload.displayName) userProfile.displayName = payload.displayName;
+            if (payload.pictureUrl) userProfile.pictureUrl = payload.pictureUrl;
         }
 
         req.user = { userId };
