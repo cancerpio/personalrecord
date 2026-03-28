@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_STORAGE_MODE: ${{ vars.VITE_STORAGE_MODE }}
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
         run: npm run build
 
       - name: Upload artifact
