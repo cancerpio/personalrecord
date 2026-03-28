@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@line/liff": "^2.27.3",
     "highcharts": "^11.1.0",
     "highcharts-vue": "^1.4.3",
     "pinia": "^3.0.4",

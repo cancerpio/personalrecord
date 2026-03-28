@@ -83,3 +83,84 @@ interface NotificationSettings {
   };
 }
 ```
+
+## 5. LocalStorage (JSON Export) Data Structure
+目前純前端模式 (`local` storage mode) 的完整資料狀態被儲存在瀏覽器的 `localStorage` 中。匯出檔案 (例如 `personal_record_app.json`) 結構如以下 JSON Schema：
+
+```typescript
+interface LocalStorageExport {
+  // 1. 動作自定義清單
+  PR_CUSTOM_EXERCISES?: string[]; // 例: ["Hang Clean", "Deadlift"]
+
+  // 2. 訓練表現紀錄集合
+  PR_SESSIONS?: {
+    id: string;              // 唯一碼 UUID
+    date: string;            // 日期 YYYY-MM-DD
+    exercise: string;        // 動作名稱
+    weight: number;          // 重量 (KG)
+    reps: number;            // 次數
+    createdAt: number;       // 時間戳記 (毫秒)
+  }[];
+
+  // 3. 身體數據紀錄集合
+  PR_BODY_METRICS?: {
+    id: string;              // 唯一碼 UUID
+    date: string;            // 日期 YYYY-MM-DD
+    bodyWeight?: number;     // 體重 (KG)，可選
+    fatPercentage?: number;  // 體脂率 (%)，可選
+    updatedAt: number;       // 更新時間戳記 (毫秒)
+  }[];
+
+  // 4. 使用者偏好設定
+  PR_SETTINGS?: {
+    notifyStaleExercise: boolean; // 停滯太久未更換動作提醒
+    notifyNoTraining: boolean;    // 沒有訓練紀錄提醒
+    notifyNoBodyFat: boolean;     // 沒有體脂紀錄提醒
+    themeMode: 'auto' | 'light' | 'dark'; // 主題偏好
+  };
+
+  // 5. 其他音訊/播放列表資料 (與本次訓練核心無關，可視需求忽略)
+  playlists?: Record<string, any[]>;
+  playlistTimestamps?: Record<string, number>;
+
+  // 6. 開發階段 PoC 資料 (開發過程產物，可忽略)
+  PR_POC_SESSIONS?: any[];
+}
+```
+
+## 6. Database Migration Strategy (LocalStorage to Firestore)
+為了支援跨裝置且與 LINE 推播整合的進階功能，未來需將上述 LocalStorage 資料轉換並匯入 Firestore。
+匯入策略與對應表如下：
+
+1. **User Settings & Custom Exercises (`users` collection)**
+   - 提取 `PR_SETTINGS` 與 `PR_CUSTOM_EXERCISES`。
+   - 更新至 Document `users/{LINE_USER_ID}` 中：
+     ```json
+     {
+       "settings": { /* PR_SETTINGS 內容 */ },
+       "customExercises": [ /* PR_CUSTOM_EXERCISES 內容 */ ],
+       "updatedAt": <Firestore Timestamp>
+     }
+     ```
+
+2. **Training Sessions (`training_sessions` collection)**
+   - 走訪 `PR_SESSIONS` 陣列中的每一個物件。
+   - 寫入 `training_sessions` 表，可使用原本的 `session.id` 作為 Document ID，或由 Firestore 自動生成 ID。
+   - 映射成 Firestore 中的格式：
+     - `userId`: 綁定目前的登入者 `{LINE_USER_ID}`。
+     - `date`: `session.date`。
+     - `exercise`: `session.exercise`。
+     - `weight`: `session.weight`。
+     - `reps`: `session.reps`。
+     - `createdAt` / `updatedAt`: Firestore Timestamp (可透過 `session.createdAt` 轉換)。
+     - *註：若舊有紀錄缺乏 `sets` 或 `rtype` 欄位，可給予預設值 (例如 `sets: 1`, `rtype: "Normal"`) 或進行資料清洗。*
+
+3. **Body Metrics (`body_metrics` collection)**
+   - 走訪 `PR_BODY_METRICS` 陣列。
+   - 寫入 `body_metrics` 表，推薦使用 `{LINE_USER_ID}_{date}` 作為 Document ID 以防止同一天重複。
+   - 映射成 Firestore 中的格式：
+     - `userId`: `{LINE_USER_ID}`。
+     - `date`: `metric.date`。
+     - `bodyWeight`: `metric.bodyWeight` (若有)。
+     - `fatPercentage`: `metric.fatPercentage` (若有)。
+     - `createdAt` / `updatedAt`: Firestore Timestamp (透過 `metric.updatedAt` 轉換，若無 createdAt 則共用 updatedAt)。

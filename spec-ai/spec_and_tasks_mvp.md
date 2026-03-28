@@ -19,12 +19,30 @@
     *   **雙層級儀表板**: 廣度預覽 (Sparklines) + 深度分析 (Hero section dual-axis chart)。
     *   **LINE Mini App 導覽限制 (Constraint)**: 由於 LIFF 環境缺乏原生瀏覽器導覽列，系統必須實作專屬的 **Bottom Tab Bar** (供主要模組切換) 以及 **自製 Top Navbar** (附帶 `< 返回` 按鈕供子頁面使用)，避免使用者迷失。
 
-### 1.3 架構與儲存模式 (API Client)
-全面採用 RESTful API 架構，前端透過 `VITE_STORAGE_MODE` 切換實作：
-1.  **`local`**: 不發 HTTP Request，純 `localStorage` 存取。
-2.  **`liff`**: 呼叫遠端 API，使用 LINE `liff.getIDToken()` 進行 JWT 驗證 (`Bearer <IDToken>`)。
+### 1.3 架構與儲存模式 (API Client) 暨環境變數雙維度切換
+全面採用 RESTful API 架構。為兼顧「純前端單機 Demo」、「本地全端 API 開發」與「正式上線」三種情境，設計了以下環境變數切換機制：
+
+1. **資料層總樞紐：`VITE_STORAGE_MODE`**
+   - `'local'`: 不發送任何 HTTP 網路請求，所有動作只透過 `LocalService.js` 在瀏覽器端的 `localStorage` 讀寫。適合無依賴連線的純 UI 展示。
+   - `'liff'`: 啟動 `LIFFService.js`，開始發動 `fetch` HTTP 請求給後端 API 伺服器。
+
+2. **登入驗證實體開關：`VITE_MOCK_LIFF_TOKEN`**（僅在 `VITE_STORAGE_MODE=liff` 時生效）
+   - `'true'`: 為了讓開發者在電腦上測試「前端打後端 API + 操作 Firestore」時不被強制跳出 LINE 登入畫面卡死，跳過真實的 LINE SDK (`liff.init()`)，直接將發送出去的 HTTP Request 挾帶一組假 Token 打向開發區的後端 Server。這極大化升級了全端整合的開發體驗。
+   - `'false'` 或未設定：打向真正的上線版 API 時，呼叫原生的 `liff.getIDToken()` 獲取真實 JWT 並作為通關信物。
 *   **後端架構與 API 端點**: 已實作為 Express + TypeScript 於 `backend/src/index.ts`。所有 `/api/v1/*` 端點及 LINE 驗證 Middleware 皆在此處。
 *   **資料庫 Schema 與部署**: Firestore 資料表設計請見 `spec-backend-mvp.md` 第 5 節；從 In-Memory 轉換至真實 Firebase Cloud Functions 的操作請見 `spec-ai/firebase-deploy.md`。
+
+### 1.4 開發與部屬期間的全端運作與串接藍圖
+儘管前端 WebApp 與後端 API 被放置在同一個專案資料夾 (Monorepo 風格) 下，但它們在執行與部屬時，實質上是兩個獨立的心臟（行程）：
+1. **本地開發與除錯 (Local Development)**：
+   - 需開啟**兩個終端機 (Terminal)**。
+   - 第一個跑 `npm run dev` 啟動前端 Vue WebApp (通常在 `localhost:5173`)。
+   - 第二個在 `backend/` 目錄跑 `npm run dev` 啟動 Node.js/Express API Server (在 `localhost:3001`)。
+   - 前端發送請求至 `http://localhost:3001/api/v1/...`，後端接收到請求後，透過 `firebase-admin` SDK 將資料非同步寫入 Google Cloud 的 Firestore 中。
+2. **正式上線部屬 (Production Deployment)**：
+   - 前端 WebApp：執行 `npm run build` 打包成靜態網頁後，由 GitHub Actions 部署至 **GitHub Pages**。
+   - 後端 API：透過 `firebase deploy --only functions`，將 Node.js Express 伺服器部署至 **Firebase Cloud Functions**。(網址將從 localhost 變成 `https://asia-east1-personalrecord...`)。
+   - 最終，部署在 GitHub Pages 的前端會設定環境變數 `VITE_API_BASE_URL`，無縫呼叫部署在 Cloud Functions 的 API，達成全球可擴縮的 Serverless 架構。
 
 ---
 
@@ -78,11 +96,12 @@
     - 兩種 Storage Service 必須實作一模一樣的 Interface。
     - UI 層 (`DashboardView`, `ProgramView`) 嚴禁直接呼叫 API 或 localStorage，所有資料存取皆需經過 `sessionStore`。
 *   **AI Execution Tasks**:
-    - [ ] Task 4.1: 建立統一的 Record Schema 與 `.env` 設定。
-    - [ ] Task 4.2: 實作 `api.js` (Repository Factory) 與 `LocalService` 底層實作。
-    - [ ] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
-    - [ ] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
-    - [ ] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
+    - [x] Task 4.1: 建立統一的 Record Schema 與 `.env` 設定。
+    - [x] Task 4.2: 實作 `api.js` (Repository Factory) 與 `LocalService` 底層實作與 `LIFFService` 遠端對接。
+    - [x] Task 4.3: 安裝 `pinia` 並開發 `sessionStore.js` (包含 actions 與 chart-ready getters)。
+    - [x] Task 4.4: 重構 `ProgramView.vue`，將存檔動作改由 dispatch store action 處理。
+    - [x] Task 4.5: 重構 `DashboardView.vue`，讓 Highcharts 圖表綁定至 store 的 getters 即時渲染。
+    - [ ] **Task 4.6 (Pending)**: 正式引入 LINE SDK (`@line/liff`)，並將 `LIFFService.js` 裡的假 Token 替換為真實的 `await liff.init()` 與 `liff.getIDToken()`。（*架構備註：需新增環境變數如 `VITE_MOCK_LIFF_TOKEN=true`，讓開發者在本地端切換為 `liff` 儲存模式測試後端 API 時，能選擇跳過真實的 LINE 登入流程，直接打假 Token 給後端*）。
 
 ### Feature 6: Ultimate Hub Architecture (Record & Settings)
 *   **User Behavior**:
@@ -151,3 +170,28 @@
     - [x] (已完成) Task 9.2: 修改 `SettingsView.vue` 實作 Theme Toggle UI 並綁定設定。
     - [x] (已完成) Task 9.3: 於 `App.vue` 實作掛載時的 Theme Injector。
     - [x] (已完成) Task 9.4: 全面清洗圖表、導航列、標題漸層色碼，替換為 `--text-primary` 與 `--glass-border` 等動態變量。
+
+### Feature 10: Backend REST API Architecture & Cloud Integration
+*   **User Behavior**: 使用者無感知。提供穩定、跨平台的資料存取、LINE 身分驗證與推播基礎設施。
+*   **Backend Implementation**: 
+    - 使用 Express.js + TypeScript 建立 API 伺服器 (`backend/src/index.ts`)。
+    - 完全抽離 Firebase Client SDK，擁抱標準 REST API。
+    - 啟動內建 `mockDb` 作為 In-Memory 儲存，供開發期除錯。
+    - 實作 LINE `IDToken` 認證 Middleware，確保資料存取與身分安全。
+    - 提供未來部署至 Firebase Cloud Functions 並轉換為 `firebase-admin/firestore` 的完整指南 (`spec-ai/firebase-deploy.md`)。
+*   **REST API Endpoints**:
+    - `POST /api/v1/sessions`: 新增訓練紀錄
+    - `GET /api/v1/sessions`: 讀取該使用者的所有訓練紀錄
+    - `PUT /api/v1/sessions/:id`: 更新單筆訓練紀錄
+    - `DELETE /api/v1/sessions/:id`: 刪除單筆訓練紀錄
+    - `POST /api/v1/body-metrics`: 新增/覆寫當日體脂體重 (Upsert)
+    - `GET /api/v1/body-metrics`: 讀取該使用者的所有體脂體重紀錄
+    - `DELETE /api/v1/body-metrics/:date`: 刪除指定日期的體脂紀錄
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 10.1: 初始化 `backend` 目錄 (Node.js & TypeScript, Express + CORS + Body Parser)。
+    - [x] (已完成) Task 10.2: 建立 In-Memory Mock Database 與資料表結構 (設計文件：`spec-backend-mvp.md`)。
+    - [x] (已完成) Task 10.3: 實作跨來源與 LINE JWT 的認證 Middleware (`mockLiffAuth`)。
+    - [x] (已完成) Task 10.4: 開發並測試 Training Records CRUD API。
+    - [x] (已完成) Task 10.5: 開發並測試 Body Metrics CRUD (含 Upsert 防呆) API。
+    - [x] (已完成) Task 10.6: 撰寫 `spec-ai/firebase-deploy.md` 雲端遷移手冊。
+    - [ ] **Task 10.7 (Pending)**: 依據後端環境變數 (如 `process.env.MOCK_LIFF_TOKEN=true`) 切換 `mockLiffAuth` 的核心邏輯。正式環境必須使用 `jsonwebtoken` 或要求 LINE 進行 JWT 驗證，並從 Payload 內的 `sub` 欄位取出真實的 `userId`，拒絕任何偽造的 `fake-liff-token` 請求。
