@@ -37,12 +37,12 @@
 
 **4. 網路通訊：`src/services/LIFFService.js`**
 - 準備發出真實的 HTTP Request。
-- **身分挾帶**：去呼叫 LINE SDK (`liff.getIDToken()`) 取得該使用者的專屬 JWT，作為門票。
+- **身分挾帶**：為了避開 LINE Mini App 開發初期的 `openid` 權限問題，改呼叫 LINE SDK (`liff.getAccessToken()`) 取得該使用者的「Access Token」，作為連線門票。
 - 將 `VITE_API_BASE_URL` (如 `http://localhost:3001/api/v1`) 與端點 `/sessions` 組合，執行 `fetch`。
   ```http
   POST /api/v1/sessions
   Content-Type: application/json
-  Authorization: Bearer <IDToken>
+  Authorization: Bearer <AccessToken>
   
   { "exercise": "Squat", "weight": 100, "reps": 5 ...}
   ```
@@ -54,11 +54,12 @@
 **5. 接收請求：`backend/src/index.ts`**
 - Express 伺服器第一關先用 `app.use(express.json())` 把剛剛從網路飛來的字串還原成 JSON Object (`req.body`)。
 
-**6. 身分驗證 Middleware：`mockLiffAuth`**
-- 當請求來到 `/api/v1/*` 區域前，被保安 `mockLiffAuth` 攔截。
-- 保安檢查 HTTP Header 裡面有沒有 `Authorization: Bearer ...`。
-- *(未來)* 解碼 LINE JWT，取出真實身分 `sub`；*(現在)* 模擬解析出一組 `userId` (例如 `U_mock_user_123`)。
-- 將 `userId` 貼在這次的包裹上（`req.user = { userId }`）放行。
+**6. 身分驗證 Middleware：`liffAuthMiddleware`**
+- 當請求來到 `/api/v1/*` 區域前，被嚴格的保安 `liffAuthMiddleware` 攔截。
+- 保安檢查 HTTP Header 裡面有沒有 `Authorization: Bearer <AccessToken>`。
+- **防偽造機制**：保安先向 `https://api.line.me/oauth2/v2.1/verify` 查驗這張票是否屬於我們的 `LINE_CLIENT_ID`。
+- **取出身分**：查驗無誤後，保安再拿著票去 `https://api.line.me/v2/profile`，獲取真實身分 `userId`。
+- 保安最後將真實的 `userId` 貼在這次的包裹上（`req.user = { userId }`）後放行，並順手將個資同步到 Firestore `Users` 集合中。
 
 **7. 路由控制器 (Controller)：`app.post('/api/v1/sessions', ...)`**
 - Controller 接手，它知道是「誰」發的請求（這點超重要，防止竄改別人的紀錄），也知道要發什麼「資料」。

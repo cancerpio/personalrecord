@@ -35,7 +35,7 @@ VITE_API_BASE_URL='https://api.yourdomain.com'
 
 2. **`liff` 模式 (遠端 API + LINE Mini App 驗證，正式上線環境)**：
    - 實作方式：使用 `fetch` / `axios` 呼叫 `VITE_API_BASE_URL`。
-   - 驗證方式：前端透過 `liff.getIDToken()` 取得 LINE 簽發的 JWT。將其放入 HTTP Header (`Authorization: Bearer <IDToken>`)。後端 API 收到 Request 後，必須先驗證此 Token 的合法性並解析出真實的 LINE `userId`，再進行資料庫存取。
+   - 驗證方式：前端透過 `liff.getAccessToken()` 取得 LINE 簽發的 Access Token。將其放入 HTTP Header (`Authorization: Bearer <AccessToken>`)。後端 API 收到 Request 後，必須先透過 `v2.1/verify` 查驗 Channel ID，再透過 `v2/profile` 取出真實的 LINE `userId`，再進行資料庫存取。
 
 
 ---

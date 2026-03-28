@@ -28,7 +28,7 @@
 
 2. **登入驗證實體開關：`VITE_MOCK_LIFF_TOKEN`**（僅在 `VITE_STORAGE_MODE=liff` 時生效）
    - `'true'`: 為了讓開發者在電腦上測試「前端打後端 API + 操作 Firestore」時不被強制跳出 LINE 登入畫面卡死，跳過真實的 LINE SDK (`liff.init()`)，直接將發送出去的 HTTP Request 挾帶一組假 Token 打向開發區的後端 Server。這極大化升級了全端整合的開發體驗。
-   - `'false'` 或未設定：打向真正的上線版 API 時，呼叫原生的 `liff.getIDToken()` 獲取真實 JWT 並作為通關信物。
+   - `'false'` 或未設定：打向真正的上線版 API 時，呼叫原生的 `liff.getAccessToken()` 獲取真實 Access Token 並作為通關信物。
 *   **後端架構與 API 端點**: 已實作為 Express + TypeScript 於 `backend/src/index.ts`。所有 `/api/v1/*` 端點及 LINE 驗證 Middleware 皆在此處。
 *   **資料庫 Schema 與部署**: Firestore 資料表設計請見 `spec-backend-mvp.md` 第 5 節；從 In-Memory 轉換至真實 Firebase Cloud Functions 的操作請見 `spec-ai/firebase-deploy.md`。
 
@@ -86,7 +86,7 @@
 *   **User Behavior**: 使用者對 App 的儲存位置感到無縫，系統依據環境變數切換，且圖表能即時反應 Program 頁面輸入的新紀錄。
 *   **Frontend Implementation**:
     - 建立 `src/services/api.js` (Repository Pattern Factory)，統一對外提供 `getSessions()`, `addSession()` 等方法。
-    - 依據環境變數 `VITE_STORAGE_MODE` 切換 `LocalService` (使用 localStorage) 或 `LIFFService` (使用 Axios + LINE JWT)。
+    - 依據環境變數 `VITE_STORAGE_MODE` 切換 `LocalService` (使用 localStorage) 或 `LIFFService` (使用 Axios + LINE Access Token)。
     - **重點架構 (Store)**: 引入 `pinia` 建立 `sessionStore.js`。由 Store 統一呼叫 API，並將生資料轉換為 Highcharts 繪圖所需的格式 (透過 getters)。
 *   **Data Structure**: 統一 Record Schema：
   ```json
@@ -190,8 +190,8 @@
 *   **AI Execution Tasks**:
     - [x] (已完成) Task 10.1: 初始化 `backend` 目錄 (Node.js & TypeScript, Express + CORS + Body Parser)。
     - [x] (已完成) Task 10.2: 建立 In-Memory Mock Database 與資料表結構 (設計文件：`spec-backend-mvp.md`)。
-    - [x] (已完成) Task 10.3: 實作跨來源與 LINE JWT 的認證 Middleware (`mockLiffAuth`)。
+    - [x] (已完成) Task 10.3: 實作跨來源與 LINE Access Token 的認證 Middleware (`liffAuthMiddleware`)。
     - [x] (已完成) Task 10.4: 開發並測試 Training Records CRUD API。
     - [x] (已完成) Task 10.5: 開發並測試 Body Metrics CRUD (含 Upsert 防呆) API。
     - [x] (已完成) Task 10.6: 撰寫 `spec-ai/firebase-deploy.md` 雲端遷移手冊。
-    - [ ] **Task 10.7 (Pending)**: 依據後端環境變數 (如 `process.env.MOCK_LIFF_TOKEN=true`) 切換 `mockLiffAuth` 的核心邏輯。正式環境必須使用 `jsonwebtoken` 或要求 LINE 進行 JWT 驗證，並從 Payload 內的 `sub` 欄位取出真實的 `userId`，拒絕任何偽造的 `fake-liff-token` 請求。
+    - [x] **Task 10.7 (已完成)**: 依據後端環境變數 (如 `process.env.MOCK_LIFF_TOKEN=true`) 切換 `liffAuthMiddleware` 的核心邏輯。正式環境使用 LINE 的 `v2/profile` 搭配 `verify` API 進行雙重驗證，從回傳值取出真實的 `userId`，拒絕任何偽造的 `fake-liff-token` 請求。
