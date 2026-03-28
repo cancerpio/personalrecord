@@ -17,7 +17,14 @@ export class LIFFService {
                 await store.initLiff(); 
             }
             token = liff.getIDToken();
-            if (!token) throw new Error("LIFF Token not found, user might not be logged in.");
+            if (!token) {
+                console.error("=== LIFF Debug Diagnostics ===");
+                try { console.error("1. Is Logged In:", liff.isLoggedIn()); } catch(e) { console.error("1. Is Logged In Eval Error:", e.message); }
+                try { console.error("2. LIFF Context:", liff.getContext()); } catch(e) { console.error("2. Context Eval Error:", e.message); }
+                console.error("3. LIFF Store Init Error History:", store.error);
+                console.error("===============================");
+                throw new Error("LIFF Token not found. Please check console for Diagnostics. (Scopes might be missing, or initialization failed).");
+            }
         }
 
         return {
