@@ -60,10 +60,13 @@ docker run -d --name frontend -p 5173:8080 pr-frontend
 ```
 
 ### 5. 功能驗證結果 (E2E Testing Confirmed)
-- 此版本已經修復了「手機無限登入迴圈」與「Vue Router 初始化跳轉白畫面」兩個重大問題。
-- 實際啟動無頭瀏覽器測試 `http://localhost:5173/personalrecord/`，系統精準讀取到 `MOCK_LIFF_TOKEN=true` 因此**沒有觸發任何 LINE 登入攔截**。
-- 在 Record 頁面實測新增訓練（Squat, 100kg, 5 reps），畫面顯示 "Saved!"，且資料**成功寫入 MongoDB 並立即在 Dashboard 圖表中同步顯示**。
-- **結論**：前後端容器與 DB 的網路隔離串接 100% 正常運作！
+- **Verda 規範合規確認**：我們完全沒有使用任何 `.env` 檔案包裝秘鑰！前端採取 CI/CD `--build-arg` 打包機制，後端採取 Container Runtime Environment Variables (`-e`)，**100% 完全符合 Verda App Runner 與資訊安全部署規範**。
+- **全端 API CRUD 與 MongoDB 穿透實測 (2026/03/29 新增)**：
+  - 我們撰寫了完整的 Shell Script 模擬前端向 `http://localhost:3001/api/v1` 發送請求。
+  - **CREATE (寫入)**：成功透過 `POST` 指令將訓練紀錄 (`Bench Press, 85kg`) 與體脂率 (`18.5%`) 寫入系統。
+  - **READ (讀取) & UPDATE (更新)**：成功用 `GET` 拿回資料，並運用回傳的 `docId` 執行 `PUT` 修改重量為 90kg，資料庫亦同步變更。
+  - **DELETE (刪除)**：執行 `DELETE` 路由，並**直接進入 MongoDB Container (`local-mongo`) 內部透過 `mongosh` 指令核對**，證實 `training_sessions` 與 `body_metrics` 兩個 Collections 內的資料確實被完美清空。
+  - **結論**：前後端容器與 MongoDB (`mongod --auth` 模式) 之間的網路隔離串接、權限認證 (MOCK)、以及資料讀寫 100% 正常運作！ 完全具備上雲部署資格。
 
 ---
 
