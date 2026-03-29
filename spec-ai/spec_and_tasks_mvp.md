@@ -44,6 +44,19 @@
    - 後端 API：透過 `firebase deploy --only functions`，將 Node.js Express 伺服器部署至 **Firebase Cloud Functions**。(網址將從 localhost 變成 `https://asia-east1-personalrecord...`)。
    - 最終，部署在 GitHub Pages 的前端會設定環境變數 `VITE_API_BASE_URL`，無縫呼叫部署在 Cloud Functions 的 API，達成全球可擴縮的 Serverless 架構。
 
+### 1.5 正式上線 (Verda 等環境) 網域拼圖 Checklist
+綜合本地 Docker 測試經驗，當準備將前後端正式部署至 **Verda** 或任意雲端環境時，為了確保 E2E (End-to-End) 功能正常連線，必須檢查以下三個「網域拼圖」是否一致扣合：
+1. **設定後端 API 網域與真實驗證**：
+   - 到 Verda 後端環境設定，移除 `-e MOCK_LIFF_TOKEN=true`，強制啟動嚴格的 LINE JWT 驗證模式。
+   - 確保 `MONGODB_URI` 已切換為 Verda 內部真實的 MongoDB 連線字串。
+   - 取得後端對外供呼叫的 HTTPS 網址（例如 `https://api.your-verda-domain.com`）。
+2. **前端打包注入環境變數 (Vite Build Args)**：
+   - 準備建置前端時，務必將上方取得的後端網址注入：`--build-arg VITE_API_BASE_URL=https://api.your-verda-domain.com/api/v1`
+   - 關閉 Frontend Mock 並設定正式版 LIFF ID：`--build-arg VITE_MOCK_LIFF_TOKEN=false` 與 `--build-arg VITE_LIFF_ID=200xxxxxx-xxxx`。
+3. **LINE Developer Console 網址註冊 (最關鍵)**：
+   - 當前端部署完成、取得前端網域後（例如 `https://app.your-verda-domain.com`），**絕對必須**至 LINE Developer Console，將對應 LIFF Channel 的 **Endpoint URL** 改為該網域路由（如：`https://app.your-verda-domain.com/personalrecord/`）。
+   - **原因**：LINE Auth Server 會根據 Endpoint URL 執行登入後的重新導向 (Redirect)。若未設定，使用者登入後將被帶往舊的測試網址（如 localhost），導致真正的系統無法讀取驗證資訊。
+
 ---
 
 ## 2. 功能實作藍圖 (Implementation Playbooks)

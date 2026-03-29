@@ -3,9 +3,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# 注入 API URL 到靜態檔（需由外部 env 帶入）
+# 注入前端所需的環境變數（支援 Build-time 覆寫本地 .env）
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+ARG VITE_LIFF_ID
+ENV VITE_LIFF_ID=$VITE_LIFF_ID
+
+ARG VITE_MOCK_LIFF_TOKEN
+ENV VITE_MOCK_LIFF_TOKEN=$VITE_MOCK_LIFF_TOKEN
+
 RUN npm run build
 
 FROM nginx:1.27-alpine
