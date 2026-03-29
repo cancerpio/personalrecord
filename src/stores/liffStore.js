@@ -34,19 +34,16 @@ export const useLiffStore = defineStore('liff', {
                         throw new Error('VITE_LIFF_ID is not defined in .env');
                     }
 
-                    await liff.init({ liffId: this.liffId });
+                    // 啟用 LINE SDK 官方的 withLoginOnExternalBrowser，它內建了防無限迴圈的機制
+                    await liff.init({ 
+                        liffId: this.liffId,
+                        withLoginOnExternalBrowser: true
+                    });
                     this.isInit = true;
 
                     if (liff.isLoggedIn()) {
                         this.isLoggedIn = true;
                         this.profile = await liff.getProfile();
-                    } else {
-                        // Automatically redirect to login if we are not in LINE Client
-                        // To prevent iOS Safari "Open in LINE" infinite loop and Hash URL loss,
-                        // we MUST provide a clean redirectUri without trailing hash.
-                        const cleanRedirectUri = window.location.origin + window.location.pathname;
-                        console.log('[LIFF Store] Redirecting to:', cleanRedirectUri);
-                        liff.login({ redirectUri: cleanRedirectUri });
                     }
                 } catch (error) {
                     console.error('LIFF initialization failed', error);

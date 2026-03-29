@@ -85,38 +85,114 @@ VITE_API_BASE_URL='https://api.yourdomain.com'
 ## 5. 資料庫結構與實作設計 (Firestore Data Model)
 
 為了滿足 MVP 的需求，並以 NoSQL 結構最大化存取效能，我們建議採用以下的 Firestore Collection 結構：
+## 5. 資料庫結構與實作設計 (MongoDB Data Model)
 
-### Collection: `users` (使用者設定與基本資料)
-每位使用者只有一份 Document，`docId` 直接使用 LINE 的 `userId`，方便快速查詢。
-* `__name__` (Doc ID): `{LINE_USER_ID}` (例如 `U1234567890abcdef...`)
-* `displayName` (string): 使用者 LINE 暱稱。
-* `pictureUrl` (string): 大頭貼網址。
-* `settings` (map): 放推播防怠惰開關設定 (與目前全域的 `PR_SETTINGS` 對齊)。
-* `createdAt` (timestamp): 首次註冊時間。
-* `updatedAt` (timestamp): 最新更新時間。
+為了符合 LINE 內部 Verda 雲端限制，我們導入了 **Repository Pattern (儲存庫模式)** 並全面從 Firestore 切換至 **Verda MongoDB Service**。
+- 開發時由 `backend/.env` 的 `DB_PROVIDER=mongodb` 控制。
+- 所有資料庫操作統一由 `backend/src/repositories` 內的 `IDatabase` 介面規範。
 
-### Collection: `training_sessions` (訓練紀錄)
-每一組 (Set) 的紀錄都是一篇獨立的 Document。
-* `__name__` (Doc ID): `{自動產生的 Firestore ID}`
-* `userId` (string): 關聯的 LINE `userId`（必定加上 Index 以便篩選該推播的使用者）。
-* `date` (string): `YYYY-MM-DD` 格式（前端傳入的訓練日期）。
-* `exercise` (string): 動作名稱 (例如 `Squat`)。
-* `weight` (number): 重量 (公斤/磅)。
-* `reps` (number): 次數。
-* `sets` (number): 組數(或編號)。
-* `rtype` (string): `RM` 或是 `Volume`。
-* `createdAt` (timestamp)
-* `updatedAt` (timestamp)
+### 5.1 Training Sessions 集合 (`training_sessions`)
+- **說明**：專屬於某位使用者的單支訓練紀錄。
+- **欄位設計 (BSON)**：
+  - `_id`: ObjectId (主鍵)
+  - `docId`: string (外部參照用的 UUID)
+  - `userId`: string (LINE UserId，用於 Indexing)
+  - `date`: string (ISO 格式如 `'2025-10-15'`)
+  - `exercise`: string
+  - `weight`: number
+  - `reps`: number
+  - `sets`: number
+  - `rtype`: string (如 `'RM'` 或 `'Sets'`)
+  - `createdAt`: string
+  - `updatedAt`: string
 
-### Collection: `body_metrics` (體脂與體重數據)
-每天一筆，可以用 `userId_YYYY-MM-DD` 的形式當作 `docId` 實現天然且無重複地 Upsert 行為。
-* `__name__` (Doc ID): `{LINE_USER_ID}_{YYYY-MM-DD}` (例如 `U1234_2026-03-10`)
-* `userId` (string): 關聯的 LINE `userId`。
-* `date` (string): `YYYY-MM-DD`。
-* `fatPercentage` (number): 體脂率 %。
-* `bodyWeight` (number): 體重 KG。
-* `createdAt` (timestamp)
-* `updatedAt` (timestamp)
+### 5.2 Users 集合 (`users`)
+- **說明**：存放使用者來自 LINE 的 Profile 或設定檔。
+- **欄位設計 (BSON)**：
+  - `_id`: ObjectId
+  - `docId`: string (直接對應 `userId`)
+  - `displayName`: string (可選)
+  - `pictureUrl`: string (可選)
+  - `settings`: object (擴充用)
+  - `createdAt`: string
+  - `updatedAt`: string
+
+### 5.3 Body Metrics 集合 (`body_metrics`)
+- **說明**：追蹤體重及體脂率變化。
+- **欄位設計 (BSON)**：
+  - `_id`: ObjectId
+  - `docId`: string (組合鍵 `userId_date`)
+  - `userId`: string
+  - `date`: string
+  - `fatPercentage`: number (可選)
+  - `bodyWeight`: number (可選)
+  - `createdAt`: string
+  - `updatedAt`: string
+
+### 5.4 實作限制與注意事項
+1. **防呆防漏**：所有 API Route 內**嚴禁寫入任何 `db.collection` 等資料庫特定語法**，一律呼叫 `await db.addSession(...)`。這保證了未來如果公司又強迫切換 DB 時，只要抽換 Repository 檔案就能解決。
+2. **連線池**：`MongoRepository` 會在啟動時快取 `Db` 實體，避免高併發打爆 MongoDB Service。
+3. **健康度與就緒狀態檢查**：配合 Verda 部署前必須的檢查，已實作 `db.isHealthy()` (使用 `ping` Command) 供 `GET /healthz/deps` 路由判定。
+4. **資料庫建立與驗證策略 (Lazy Creation & Application-Level Validation)**：
+   - 捨棄 MongoDB Native Schema Validation，避免繁瑣的預先建立 (Pre-create collections) 手續以及難以解讀的 `MongoServerError`。
+   - 資料庫與 Collections 將採用 **懶人建立 (Lazy Creation)** 機制，隨著第一筆合法請求動態於 Verda MongoDB (或 Local Docker) 中產生。
+   - 所有資料防呆（如型別、非空與範圍檢查），皆交由**後端 API 層 (Node.js)** 透過 `TypeScript` 或是未來引入之 `Zod` 套件攔截，以確保能向前端回傳語意清晰的 `HTTP 400 Bad Request` 訊息。
+
+---
+
+## 6. Docker 化與本機全端串接測試指南 (Verda 生態模擬)
+
+為了模擬部署到 LINE Harbor 與 App Runner (Route B) 的真實情境，我們建立了三個相互獨立的 Docker 容器。本指南說明如何在開發機上執行從零編譯、串聯與啟動的所有步驟。
+
+### 6.1 架構與網路拓樸
+- **前端 (Frontend)**: `localhost:5173` (Nginx + Vue 靜態檔)
+- **後端 (Backend)**: `localhost:3001` (Node.js API)
+- **資料庫 (Database)**: `localhost:27017` (MongoDB 6.0 具名驗證)
+
+### 6.2 啟動步驟 (How to Build & Run)
+
+**第一步：啟動 MongoDB (帶密碼驗證)**
+```bash
+cd backend
+# -v: 清除舊的無密碼卷宗以確保 root 初始化順利
+docker compose down -v
+docker compose up -d
+```
+*這會在背景跑出 `local-mongo` 容器，具備帳號 `devuser` 與密碼 `devpassword`。*
+
+**第二步：編譯與啟動 Node 後端 API 容器**
+因為 Node 後端需要能夠從「它的容器內部」打向「你 Mac 電腦上的 MongoDB」，所以連線字串的 Host 不能寫 `localhost`，而必須寫 Docker 特權主機名 `host.docker.internal` (適用於 Docker Desktop for Mac)。
+```bash
+cd backend
+# 1. 將後端程式碼打包成 Image
+docker build -t pr-backend .
+
+# 2. 啟動並對外暴露 3001 Port，且啟動 MOCK  Bypass 開關
+docker run -d --name test-backend -p 3001:8080 \
+  -e PORT=8080 \
+  -e DB_PROVIDER=mongodb \
+  -e MONGODB_URI="mongodb://devuser:devpassword@host.docker.internal:27017/personalrecord?authSource=admin" \
+  -e MOCK_LIFF_TOKEN=true \
+  pr-backend
+```
+*驗證：* `curl -s http://localhost:3001/healthz/deps` 須回傳 `{"status":"ok","db":"ok"...}`
+
+**第三步：編譯與啟動 Vue 前端 Nginx 容器**
+編譯前端最重要的大原則是：**Vite 需要在 Build 的瞬間就要知道後端的網址**。所以我們必須透過 `--build-arg` 把剛剛跑起來的 3001 Port API 網址塞進去。
+```bash
+# 回到專案根目錄
+cd ..
+
+# 1. 帶入剛才成功架設的後端網址進行 Build
+docker build --build-arg VITE_API_BASE_URL=http://localhost:3001/api/v1 -t pr-frontend .
+
+# 2. 把 Nginx 啟動在常用的 5173 Port
+docker run -d --name test-frontend -p 5173:8080 pr-frontend
+```
+
+### 6.3 最終整合驗證
+打開你的無痕模式瀏覽器，進入 `http://localhost:5173/#/dashboard`。因為我們設定了 `MOCK_LIFF_TOKEN=true`，系統會自動使用假身分 `U_mock_user_123` 通關，並能毫無限制地開始在 MongoDB 裡建立你的第一筆獨立資料。
+（結束測試後，可以用 `docker stop test-backend test-frontend` 關閉）
 
 > 💡 **Firebase 開發實戰：** 初期為了無痛開發與除錯，我們會在本機啟動 `express` 伺服器，並使用一個變數 `const mockDb = {}` 作為 In-Memory Mock DB 暫存上述的 Collection。待架構與前端 UI 對接成功後，只需把 CRUD 的部份換成真實的 `firebase-admin/firestore` SDK 即可無縫接軌。
 

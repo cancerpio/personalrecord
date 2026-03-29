@@ -37,8 +37,9 @@
 
 **4. 網路通訊：`src/services/LIFFService.js`**
 - 準備發出真實的 HTTP Request。
-- **身分挾帶**：為了避開 LINE Mini App 開發初期的 `openid` 權限問題，改呼叫 LINE SDK (`liff.getAccessToken()`) 取得該使用者的「Access Token」，作為連線門票。
-- 將 `VITE_API_BASE_URL` (如 `http://localhost:3001/api/v1`) 與端點 `/sessions` 組合，執行 `fetch`。
+- **環境設定與身份覆寫 (Mock Bypass)**：為了滿足本地 Docker 的全端測試環境，服務會檢查 `VITE_MOCK_LIFF_TOKEN`。如果啟用，會自動配發測試用的 Token 騙過後台，避開真實的 LINE OAuth 驗證門檻。
+- **身分挾帶 (正常流程)**：為了避開 LINE Mini App 開發初期的 `openid` 權限問題，改呼叫 LINE SDK (`liff.getAccessToken()`) 取得該使用者的「Access Token」，作為連線門票。
+- 將 `VITE_API_BASE_URL` (例如在 Docker Compose 測試時會是 `http://localhost:3001/api/v1`) 與端點 `/sessions` 組合，執行 `fetch`。
   ```http
   POST /api/v1/sessions
   Content-Type: application/json
@@ -70,16 +71,19 @@
 
 ---
 
-### Phase 4: 資料庫與雲端 (Database Layer)
+### Phase 4: 資料庫與雲端 (Database Layer / Repository)
 
-**8. 資料庫 SDK 寫入：`backend/src/db.ts`**
-- `db.addSession` 得知指令。它打開 Google Cloud Firestore 專用 SDK。
-- **自動產生存檔抽屜**：`db.collection('training_sessions').doc()` 自動幫這筆資料生了一組亂數 Doc ID。
-- **加上時間浮水印**：向伺服器要當下的精確時間 `FieldValue.serverTimestamp()` 當作 `createdAt` 與 `updatedAt`。
-- **塞入資料庫**：執行 `await sessionRef.set(session);`，資料正式跨海沉睡在 Google Cloud 裡。
+**8. Factory 模式調用：`backend/src/db.ts`**
+- `db.addSession` 得知指令。此處的 `db` 已經具備了 **Repository Factory** 的身份，它會依據 `process.env.DB_PROVIDER` 決定將請求交付給 `MongoRepository` 或 `FirestoreRepository` 處理。
+
+**8.1 (如果是 MongoDB 模式)**
+- **連線池檢查**：`MongoRepository` 確認 `MongoClient` 已連線並取得 `Db` 實體。
+- **自動產生存檔抽屜**：呼叫 `new ObjectId().toString()` 產生唯一的主鍵與 `docId`。
+- **加上時間浮水印**：建立 `new Date().toISOString()` 當作 `createdAt` 與 `updatedAt`。
+- **塞入資料庫**：執行 `await collection.insertOne(...)`，資料正式沉睡在 Verda MongoDB 叢集內。
 
 **9. 沿途折返 (Response Return)**
-- `db.ts` 把剛才加上 ID 與時間戳記的完整資料，轉換為字串丟回給 Controller。
+- Repository 把剛才加上 ID 與時間戳記的完整資料，轉換為通用的 `TrainingSession` 介面字串丟回給 Controller。
 - Controller 看到資料搞定了，開心地回覆 `HTTP 201 Created` 並且把 JSON 吐回前端：
   ```javascript
   res.status(201).json({ data: newSession });

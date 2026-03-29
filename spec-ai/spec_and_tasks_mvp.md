@@ -195,3 +195,16 @@
     - [x] (已完成) Task 10.5: 開發並測試 Body Metrics CRUD (含 Upsert 防呆) API。
     - [x] (已完成) Task 10.6: 撰寫 `spec-ai/firebase-deploy.md` 雲端遷移手冊。
     - [x] **Task 10.7 (已完成)**: 依據後端環境變數 (如 `process.env.MOCK_LIFF_TOKEN=true`) 切換 `liffAuthMiddleware` 的核心邏輯。正式環境使用 LINE 的 `v2/profile` 搭配 `verify` API 進行雙重驗證，從回傳值取出真實的 `userId`，拒絕任何偽造的 `fake-liff-token` 請求。
+
+### Feature 11: Verda MongoDB 雲端遷移與 Repository Pattern (Dual-Database)
+*   **User Behavior**: 開發與上線體驗不變。系統底層從 Firestore 切換至 Verda MongoDB Service，確保合乎 LINE 內部網路限制。
+*   **Backend Implementation**:
+    - 導入 Repository Pattern，根據 `DB_PROVIDER=mongodb|firestore` 切換儲存實體。
+    - 使用原生 `mongodb` driver 連線。
+    - 建立前端與後端的 Dockerfile (Multi-stage build) 符合 App Runner Public Harbor Route B 部屬標準。
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 11.1: 實作統一介面 `IDatabase` 與 `FirestoreRepository`, `MongoRepository` 雙軌適配器。
+    - [x] (已完成) Task 11.2: 重構 `index.ts` 與 API Route，全面改為依賴 Repository。
+    - [x] (已完成) Task 11.3: 加入 `/healthz/deps` Verda Dev Gate MongoDB Health Check API。
+    - [x] (已完成) Task 11.4: 建立 `Dockerfile` (前端 Vue + Nginx, 相容 Alias 路徑) 與 `backend/Dockerfile` (Node Alpine)。
+    - [x] (已完成) Task 11.5: 在本地驗證前端容器 (`localhost:5173`) 經由 MOCK 模式，成功將資料寫入本地叢集之 MongoDB 容器 (`host.docker.internal:27017`)，完成全端 Docker E2E 整合。

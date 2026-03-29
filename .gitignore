@@ -104,3 +104,6 @@ dist
 .tern-port
 backups/
 implement-revert-point.txt
+
+# Internal LINE Documentation
+/internal/
