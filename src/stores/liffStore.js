@@ -42,7 +42,11 @@ export const useLiffStore = defineStore('liff', {
                         this.profile = await liff.getProfile();
                     } else {
                         // Automatically redirect to login if we are not in LINE Client
-                        liff.login();
+                        // To prevent iOS Safari "Open in LINE" infinite loop and Hash URL loss,
+                        // we MUST provide a clean redirectUri without trailing hash.
+                        const cleanRedirectUri = window.location.origin + window.location.pathname;
+                        console.log('[LIFF Store] Redirecting to:', cleanRedirectUri);
+                        liff.login({ redirectUri: cleanRedirectUri });
                     }
                 } catch (error) {
                     console.error('LIFF initialization failed', error);
