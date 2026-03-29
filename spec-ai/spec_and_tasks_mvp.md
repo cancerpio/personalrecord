@@ -44,6 +44,19 @@
    - 後端 API：透過 `firebase deploy --only functions`，將 Node.js Express 伺服器部署至 **Firebase Cloud Functions**。(網址將從 localhost 變成 `https://asia-east1-personalrecord...`)。
    - 最終，部署在 GitHub Pages 的前端會設定環境變數 `VITE_API_BASE_URL`，無縫呼叫部署在 Cloud Functions 的 API，達成全球可擴縮的 Serverless 架構。
 
+### 1.5 正式上線 (Verda 等環境) 網域拼圖 Checklist
+綜合本地 Docker 測試經驗，當準備將前後端正式部署至 **Verda** 或任意雲端環境時，為了確保 E2E (End-to-End) 功能正常連線，必須檢查以下三個「網域拼圖」是否一致扣合：
+1. **設定後端 API 網域與真實驗證**：
+   - 到 Verda 後端環境設定，移除 `-e MOCK_LIFF_TOKEN=true`，強制啟動嚴格的 LINE JWT 驗證模式。
+   - 確保 `MONGODB_URI` 已切換為 Verda 內部真實的 MongoDB 連線字串。
+   - 取得後端對外供呼叫的 HTTPS 網址（例如 `https://api.your-verda-domain.com`）。
+2. **前端打包注入環境變數 (Vite Build Args)**：
+   - 準備建置前端時，務必將上方取得的後端網址注入：`--build-arg VITE_API_BASE_URL=https://api.your-verda-domain.com/api/v1`
+   - 關閉 Frontend Mock 並設定正式版 LIFF ID：`--build-arg VITE_MOCK_LIFF_TOKEN=false` 與 `--build-arg VITE_LIFF_ID=200xxxxxx-xxxx`。
+3. **LINE Developer Console 網址註冊 (最關鍵)**：
+   - 當前端部署完成、取得前端網域後（例如 `https://app.your-verda-domain.com`），**絕對必須**至 LINE Developer Console，將對應 LIFF Channel 的 **Endpoint URL** 改為該網域路由（如：`https://app.your-verda-domain.com/personalrecord/`）。
+   - **原因**：LINE Auth Server 會根據 Endpoint URL 執行登入後的重新導向 (Redirect)。若未設定，使用者登入後將被帶往舊的測試網址（如 localhost），導致真正的系統無法讀取驗證資訊。
+
 ---
 
 ## 2. 功能實作藍圖 (Implementation Playbooks)
@@ -195,3 +208,16 @@
     - [x] (已完成) Task 10.5: 開發並測試 Body Metrics CRUD (含 Upsert 防呆) API。
     - [x] (已完成) Task 10.6: 撰寫 `spec-ai/firebase-deploy.md` 雲端遷移手冊。
     - [x] **Task 10.7 (已完成)**: 依據後端環境變數 (如 `process.env.MOCK_LIFF_TOKEN=true`) 切換 `liffAuthMiddleware` 的核心邏輯。正式環境使用 LINE 的 `v2/profile` 搭配 `verify` API 進行雙重驗證，從回傳值取出真實的 `userId`，拒絕任何偽造的 `fake-liff-token` 請求。
+
+### Feature 11: Verda MongoDB 雲端遷移與 Repository Pattern (Dual-Database)
+*   **User Behavior**: 開發與上線體驗不變。系統底層從 Firestore 切換至 Verda MongoDB Service，確保合乎 LINE 內部網路限制。
+*   **Backend Implementation**:
+    - 導入 Repository Pattern，根據 `DB_PROVIDER=mongodb|firestore` 切換儲存實體。
+    - 使用原生 `mongodb` driver 連線。
+    - 建立前端與後端的 Dockerfile (Multi-stage build) 符合 App Runner Public Harbor Route B 部屬標準。
+*   **AI Execution Tasks**:
+    - [x] (已完成) Task 11.1: 實作統一介面 `IDatabase` 與 `FirestoreRepository`, `MongoRepository` 雙軌適配器。
+    - [x] (已完成) Task 11.2: 重構 `index.ts` 與 API Route，全面改為依賴 Repository。
+    - [x] (已完成) Task 11.3: 加入 `/healthz/deps` Verda Dev Gate MongoDB Health Check API。
+    - [x] (已完成) Task 11.4: 建立 `Dockerfile` (前端 Vue + Nginx, 相容 Alias 路徑) 與 `backend/Dockerfile` (Node Alpine)。
+    - [x] (已完成) Task 11.5: 在本地驗證前端容器 (`localhost:5173`) 經由 MOCK 模式，成功將資料寫入本地叢集之 MongoDB 容器 (`host.docker.internal:27017`)，完成全端 Docker E2E 整合。

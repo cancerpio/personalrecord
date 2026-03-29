@@ -8,9 +8,7 @@ const route = useRoute();
 const router = useRouter();
 const liffStore = useLiffStore();
 
-onMounted(() => {
-  liffStore.initLiff();
-});
+// liffStore.initLiff() moved to main.js to prevent Vue Router race conditions
 
 const currentPath = computed(() => {
   return route.path;

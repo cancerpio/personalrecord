@@ -7,6 +7,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- Dev Gate Health Checks ---
+app.get('/healthz', (req, res) => {
+    res.status(200).send('ok');
+});
+
+app.get('/healthz/deps', async (req, res) => {
+    // Check Database Health via unified Repository interface
+    const isDbHealthy = await db.isHealthy();
+
+    res.json({
+        status: isDbHealthy ? 'ok' : 'degraded',
+        db: isDbHealthy ? 'ok' : 'error',
+        openai: 'pending' // TODO: implement OpenAI integration
+    });
+});
+
 // 擴充 Express Request 型別以支援自訂的 userId
 declare global {
     namespace Express {
@@ -178,11 +194,12 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // --- Execution & Deployment Mode ---
-// For Local Development (only active if not running inside Firebase Functions emulator)
-if (process.env.NODE_ENV !== 'production' && !process.env.FUNCTIONS_EMULATOR) {
+// For Standalone Express Server (Local Development or Docker)
+// Only skip if running inside Firebase Cloud Functions (where FIREBASE_CONFIG is present)
+if (!process.env.FIREBASE_CONFIG && !process.env.FUNCTIONS_EMULATOR) {
     const PORT = process.env.PORT || 3001;
     app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
+        console.log(`Server is running on port ${PORT}`);
     });
 }
 

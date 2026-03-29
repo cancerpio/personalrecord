@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+dist
+.DS_Store
+*.log
+backend
+internal
+spec-ai
+.agent
