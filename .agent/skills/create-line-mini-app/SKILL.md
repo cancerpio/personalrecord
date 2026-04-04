@@ -283,3 +283,15 @@ liffStore.init().finally(async () => {
 - Create a `.env` file with `VITE_LIFF_ID=YOUR_LIFF_ID`.
 - Run `npm run dev` and verify the page loads with the gradient background.
 - **Test on iPhone by opening the app from a LINE chat message** (not by typing the URL in Safari).
+
+### Step 9: Security & Common Channel Migration Gotchas
+
+**⚠️ 1. The Provider UserID Isolation Trap**
+A common scenario is developers creating a new Mini App Channel under a DIFFERENT "Provider" in the LINE Console.
+- **Rule**: `userId` (e.g. `U1234abcd...`) is scoped by **Provider**, not by user phone or email. 
+- **Consequence**: If you switch to a new Provider, the exact same LINE user will be assigned a completely new `userId`. Any existing records saved in a backend database (like Firestore/MongoDB) keyed by the old `userId` will appear "missing" when they log in via the new Mini App.
+
+**⚠️ 2. The Backend API 401 Unauthorized Trap**
+If you update your frontend's `.env` with a new `VITE_LIFF_ID` (Channel ID), you MUST also update your backend server's environment variables.
+- **Rule**: The backend auth middleware (`liffAuthMiddleware`) verifies that the access token's `client_id` matches the backend's `LINE_CLIENT_ID` env variable.
+- **Consequence**: If you forget to update the backend's `LINE_CLIENT_ID`, the backend will reject the new frontend's valid token with a `401 Unauthorized` error (Channel ID mismatch), causing API calls to silently fail and components to render empty data.
