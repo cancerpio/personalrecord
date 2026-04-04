@@ -116,6 +116,21 @@ body {
 ```
 
 ### Step 5: Setup LIFF Initialization (Store)
+
+#### 🚨 CRITICAL: Supported Entry Points (設計前提)
+
+**本 skill 的設計目標支援以下組合：**
+- **手機（iPhone / Android）**：從 LINE 聊天室點 `miniapp.line.me/xxx` 連結，在 LINE WebView 內執行
+- **桌機**：直接在瀏覽器開 Endpoint URL（GitHub Pages、Verda 等）
+
+**不支援、且無法用 code 修復的場景：**
+> **iPhone Safari 直接輸入 Endpoint URL** 會造成無限 loop。
+> iOS 裝了 LINE app 後，LINE 的 OAuth URL 會被 iOS Universal Link 機制攔截，強制切換到 LINE app 處理，再開一個全新的 Safari context 回來。新 context 清掉 sessionStorage，所有防迴圈機制失效。這是 iOS 系統層級行為，JavaScript 無法繞過。
+
+**注意：** `miniapp.line.me` 和 `liff.line.me` 在桌機瀏覽器只會顯示 QR code，這是 LINE Mini App 的設計規格，不是 bug。
+
+---
+
 Create `src/stores/liff.ts` using Pinia to manage LIFF state.
 
 ```typescript
@@ -125,33 +140,40 @@ import liff from '@line/liff';
 export const useLiffStore = defineStore('liff', {
   state: () => ({
     liffId: import.meta.env.VITE_LIFF_ID || '',
+    isInit: false,
     isLoggedIn: false,
     profile: null as any,
-    _initPromise: null as Promise<void> | null // Promise lock for concurrency
+    error: null as string | null,
+    _initPromise: null as Promise<void> | null
   }),
   actions: {
     async init() {
-      if (this.isLoggedIn) return;
-      
-      // Concurrency Lock: Prevent multiple components from calling liff.init() simultaneously
-      // This avoids the '400 Bad Request: invalid authorization code' error 
-      // when Vue components and Router hooks race each other on app load.
+      if (this.isInit) return;
+
+      // Concurrency Lock: Prevent multiple components from calling liff.init() simultaneously.
+      // Without this, concurrent calls share the same ?code= param and the second call
+      // gets HTTP 400 "invalid authorization code" from LINE API.
       if (this._initPromise) return this._initPromise;
 
       this._initPromise = (async () => {
         if (!this.liffId) return;
         try {
           await liff.init({ liffId: this.liffId });
+          this.isInit = true;
+
           if (liff.isLoggedIn()) {
             this.isLoggedIn = true;
             this.profile = await liff.getProfile();
           } else {
-               // For Mini App, auto login usually happens inside LINE
-               // For external browser, redirect to login
-               liff.login();
+            // LINE WebView: LIFF handles auth automatically before reaching here.
+            // Desktop browser: triggers OAuth in the same tab, no issues.
+            // ⚠️ iPhone Safari (external browser): NOT a supported entry point.
+            //    Users on iPhone should always open the app from within LINE.
+            liff.login();
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('LIFF Init Failed', err);
+          this.error = err.message;
         } finally {
           this._initPromise = null;
         }
@@ -228,7 +250,48 @@ export const liffAuthMiddleware = async (req: Request, res: Response, next: Next
   2.  **Dynamic Top Navbar**: Create a custom Top Navbar with a `< Back` button, but **ONLY render it on deep sub-pages** (e.g., `v-if="!isRootPage"`). On root pages, hide it completely so the content sits flush under the LINE native Header.
   3.  **Vue Router History Edge-Case**: When the user clicks `< Back`, use `router.back()`. However, beware of direct deep-linking or page refreshes on sub-pages where `window.history.length === 1`. In those cases, provide a fallback (e.g., `router.push('/')`) to prevent the user from getting trapped.
 
-### Step 7: Final Verification
-- Ensure `src/main.ts` setups Pinia and Router.
+### Step 7: Wire Up main.ts (Initialization Order is Critical)
+
+**LIFF must initialize BEFORE Vue Router is mounted.**
+
+桌機走 OAuth 流程時，LINE 會把 auth code 放在 URL query string（`?code=xxx&liff.state=...`）。如果 Router 先跑，它的 redirect（`/ → /dashboard`）會覆寫 URL，把這些參數洗掉，LIFF 就拿不到 auth code，導致認證失敗並再次觸發登入。
+
+```typescript
+// src/main.ts
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import App from './App.vue'
+import router from './router'
+import { useLiffStore } from './stores/liff'
+
+const app = createApp(App)
+const pinia = createPinia()
+
+app.use(pinia)
+
+const liffStore = useLiffStore()
+
+// Init LIFF first, then mount router
+liffStore.init().finally(async () => {
+  app.use(router)
+  await router.isReady() // Wait for initial redirect (e.g. / → /dashboard) before mounting
+  app.mount('#app')
+})
+```
+
+### Step 8: Final Verification
 - Create a `.env` file with `VITE_LIFF_ID=YOUR_LIFF_ID`.
 - Run `npm run dev` and verify the page loads with the gradient background.
+- **Test on iPhone by opening the app from a LINE chat message** (not by typing the URL in Safari).
+
+### Step 9: Security & Common Channel Migration Gotchas
+
+**⚠️ 1. The Provider UserID Isolation Trap**
+A common scenario is developers creating a new Mini App Channel under a DIFFERENT "Provider" in the LINE Console.
+- **Rule**: `userId` (e.g. `U1234abcd...`) is scoped by **Provider**, not by user phone or email. 
+- **Consequence**: If you switch to a new Provider, the exact same LINE user will be assigned a completely new `userId`. Any existing records saved in a backend database (like Firestore/MongoDB) keyed by the old `userId` will appear "missing" when they log in via the new Mini App.
+
+**⚠️ 2. The Backend API 401 Unauthorized Trap**
+If you update your frontend's `.env` with a new `VITE_LIFF_ID` (Channel ID), you MUST also update your backend server's environment variables.
+- **Rule**: The backend auth middleware (`liffAuthMiddleware`) verifies that the access token's `client_id` matches the backend's `LINE_CLIENT_ID` env variable.
+- **Consequence**: If you forget to update the backend's `LINE_CLIENT_ID`, the backend will reject the new frontend's valid token with a `401 Unauthorized` error (Channel ID mismatch), causing API calls to silently fail and components to render empty data.

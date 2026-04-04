@@ -12,16 +12,17 @@ export const useLiffStore = defineStore('liff', {
     }),
     actions: {
         async initLiff() {
-            if (this.isInit) return; // Already initialized
-            
-            // Если инициализация уже началась, ждем ее окончания (防止併發重複呼叫)
+            if (this.isInit) return;
+
+            // Concurrency lock: prevent multiple components from calling liff.init() simultaneously.
+            // Without this, concurrent calls share the same ?code= param and the second call
+            // gets HTTP 400 "invalid authorization code" from LINE API.
             if (this._initPromise) {
                 return this._initPromise;
             }
 
             this._initPromise = (async () => {
                 try {
-                    // If mock token is explicitly enabled, we skip real liff initialization
                     if (import.meta.env.VITE_MOCK_LIFF_TOKEN === 'true') {
                         console.warn('[LIFF Store] Running in MOCK mode. Real LIFF initialization bypassed.');
                         this.isInit = true;
@@ -34,16 +35,20 @@ export const useLiffStore = defineStore('liff', {
                         throw new Error('VITE_LIFF_ID is not defined in .env');
                     }
 
-                    // 啟用 LINE SDK 官方的 withLoginOnExternalBrowser，它內建了防無限迴圈的機制
-                    await liff.init({ 
-                        liffId: this.liffId,
-                        withLoginOnExternalBrowser: true
-                    });
+                    await liff.init({ liffId: this.liffId });
                     this.isInit = true;
 
                     if (liff.isLoggedIn()) {
                         this.isLoggedIn = true;
                         this.profile = await liff.getProfile();
+                    } else {
+                        // LINE WebView: LIFF handles auth automatically before reaching here.
+                        // Desktop browser: triggers OAuth in the same tab, no issues.
+                        // ⚠️ iPhone Safari (external browser): NOT a supported entry point.
+                        //    iOS Universal Links will intercept LINE's OAuth URL and open the LINE app,
+                        //    creating a new Safari context that breaks the auth flow. Users on iPhone
+                        //    should always open the app from within LINE (miniapp.line.me link in chat).
+                        liff.login();
                     }
                 } catch (error) {
                     console.error('LIFF initialization failed', error);

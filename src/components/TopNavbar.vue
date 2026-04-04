@@ -6,8 +6,10 @@ const route = useRoute();
 const router = useRouter();
 
 const canGoBack = computed(() => {
-  // If we are not on a root page, we should show the TopNavbar with a back button.
-  return route.path !== '/' && route.path !== '/dashboard' && route.path !== '/program' && route.path !== '/log';
+  // Only show TopNavbar with Back button on deep sub-pages.
+  // Root tab pages (Dashboard, Record, Settings) must NOT show it.
+  const rootPaths = ['/', '/dashboard', '/record', '/settings'];
+  return !rootPaths.includes(route.path);
 });
 
 const pageTitle = computed(() => {
@@ -19,7 +21,7 @@ const goBack = () => {
     router.back();
   } else {
     // Fallback if the user refreshed a sub-page directly and has no browser history
-    router.push('/program');
+    router.push('/dashboard');
   }
 };
 </script>

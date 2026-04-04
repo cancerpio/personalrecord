@@ -32,6 +32,12 @@ const routes = [
         name: 'Settings',
         component: SettingsView,
         meta: { title: 'Settings' }
+    },
+    // Catch-all route to handle unexpected paths injected by LINE/LIFF redirect URLs
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'NotFound',
+        redirect: '/dashboard'
     }
 ]
 
