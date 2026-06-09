@@ -7,6 +7,8 @@ import { useSessionStore } from '../stores/sessionStore.js';
 
 const sessionStore = useSessionStore();
 
+const volumeInfo = computed(() => sessionStore.weeklyTrainingVolumeInfo);
+
 // Default to an empty string initially, the watcher will populate it if exercises exist
 const filters = ref({
   exercise: '', 
@@ -165,6 +167,46 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Weekly Training Volume Card -->
+    <div v-if="volumeInfo" class="volume-card glass-panel" :class="{ refreshing: loading }">
+      <div class="volume-header">
+        <div class="volume-title-group">
+          <span class="volume-label">當週訓練總容積</span>
+          <h2 class="volume-value">
+            {{ volumeInfo.currentVolume.toLocaleString() }}
+            <span class="unit">kg</span>
+          </h2>
+        </div>
+        <div class="volume-trend" :class="volumeInfo.trend">
+          <div class="trend-badge">
+            <!-- UP ARROW -->
+            <svg v-if="volumeInfo.trend === 'up'" class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+              <polyline points="17 6 23 6 23 12"></polyline>
+            </svg>
+            <!-- DOWN ARROW -->
+            <svg v-else-if="volumeInfo.trend === 'down'" class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+              <polyline points="17 18 23 18 23 12"></polyline>
+            </svg>
+            <!-- STABLE LINE -->
+            <svg v-else-if="volumeInfo.trend === 'stable'" class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <polyline points="15 5 22 12 15 19"></polyline>
+            </svg>
+            <!-- NO TREND / DATA -->
+            <svg v-else class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span class="trend-text">{{ volumeInfo.statusLabel }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="volume-footer">
+        <span class="history-average">歷史每週平均容積：{{ volumeInfo.averageVolume.toLocaleString() }} kg</span>
+      </div>
+    </div>
+
     <!-- Sparklines (Performance Trends) -->
     <div class="sparklines-container" :class="{ refreshing: loading }">
       <SparklineRow 
@@ -206,6 +248,110 @@ onMounted(() => {
 
 .header-section {
   padding: 0 4px;
+}
+
+.volume-card {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  transition: opacity 0.3s ease;
+}
+
+.volume-card.refreshing {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.volume-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.volume-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.volume-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.volume-value {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 4px 0 0 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.volume-value .unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.volume-trend {
+  display: flex;
+  align-items: center;
+}
+
+.trend-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.volume-trend.up .trend-badge {
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
+}
+
+.volume-trend.down .trend-badge {
+  background: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+
+.volume-trend.stable .trend-badge {
+  background: rgba(255, 149, 0, 0.15);
+  color: #ff9500;
+}
+
+.volume-trend.none .trend-badge {
+  background: rgba(142, 142, 147, 0.15);
+  color: var(--text-secondary);
+}
+
+.trend-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+
+.volume-footer {
+  border-top: 0.5px solid var(--separator-color);
+  padding-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-average {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .sparklines-container {
