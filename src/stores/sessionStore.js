@@ -1,6 +1,17 @@
 import { defineStore } from 'pinia';
 import { api } from '../services/api';
 
+function getMondayOfDate(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    const day = date.getUTCDay(); // 0 is Sunday, 1 is Monday, ...
+    const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(Date.UTC(y, m - 1, diff));
+    const mm = String(monday.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(monday.getUTCDate()).padStart(2, '0');
+    return `${monday.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 export const useSessionStore = defineStore('session', {
     state: () => ({
         sessions: [],
@@ -13,6 +24,59 @@ export const useSessionStore = defineStore('session', {
         // Basic getter
         getSessionsByExercise: (state) => (exerciseName) => {
             return state.sessions.filter(s => s.exercise === exerciseName).sort((a, b) => new Date(a.date) - new Date(b.date));
+        },
+
+        // Weekly training volume calculation and trend
+        weeklyTrainingVolumeInfo: (state) => {
+            const weeklyVolumes = {};
+            state.sessions.forEach(session => {
+                const dateStr = session.date;
+                if (!dateStr) return;
+                const monday = getMondayOfDate(dateStr);
+                const vol = (session.sets || 0) * (session.reps || 0) * (session.weight || 0);
+                weeklyVolumes[monday] = (weeklyVolumes[monday] || 0) + vol;
+            });
+
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${y}-${m}-${d}`;
+            const currentMonday = getMondayOfDate(todayStr);
+
+            const currentVolume = weeklyVolumes[currentMonday] || 0;
+
+            const pastWeeks = Object.keys(weeklyVolumes).filter(monday => monday !== currentMonday);
+            let averageVolume = 0;
+            if (pastWeeks.length > 0) {
+                const totalPastVolume = pastWeeks.reduce((sum, monday) => sum + weeklyVolumes[monday], 0);
+                averageVolume = Math.round(totalPastVolume / pastWeeks.length);
+            }
+
+            let trend = 'none';
+            let statusLabel = '—';
+            if (pastWeeks.length > 0) {
+                if (currentVolume > averageVolume * 1.05) {
+                    trend = 'up';
+                    statusLabel = '上升';
+                } else if (currentVolume < averageVolume * 0.95) {
+                    trend = 'down';
+                    statusLabel = '下降';
+                } else {
+                    trend = 'stable';
+                    statusLabel = '持平';
+                }
+            } else {
+                trend = currentVolume > 0 ? 'up' : 'none';
+                statusLabel = currentVolume > 0 ? '首週訓練中' : '—';
+            }
+
+            return {
+                currentVolume,
+                averageVolume,
+                trend,
+                statusLabel
+            };
         },
 
         // Transforms data into [timestamp, weight] format for Highcharts
