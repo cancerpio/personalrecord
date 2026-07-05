@@ -6,11 +6,13 @@ This capability calculates and tracks the weekly training volume and provides co
 ## Requirements
 
 ### Requirement: Calculate Weekly Training Volume
-The system SHALL calculate the weekly training volume for the current calendar week (Monday to Sunday) by summing the product of `sets * reps * weight` for all training sessions in the current week.
+系統 SHALL 計算當前日曆週（週一到週日）的訓練容積：對該週內所有訓練紀錄加總 `reps * weight`。
 
-#### Scenario: Calculate volume with multiple sessions
-- **WHEN** the user has training sessions in the current week with (sets=3, reps=10, weight=100) and (sets=5, reps=5, weight=120)
-- **THEN** the weekly training volume SHALL be 4800 (3*10*100 + 5*5*120)
+每一筆 session 紀錄代表「一組(set)」，欄位為 `{ date, exercise, weight, reps }`，資料模型中並無 `sets` 欄位；「幾組」已由「有幾筆紀錄」體現。因此容積公式為逐筆加總 `reps * weight`，不再乘以 `sets`。此定義天生支援同一動作各組使用不同重量的情況。
+
+#### Scenario: Calculate volume with multiple sets
+- **WHEN** the user has training sessions in the current week with (reps=5, weight=50), (reps=5, weight=30), and (reps=5, weight=20)
+- **THEN** the weekly training volume SHALL be 500 (5*50 + 5*30 + 5*20)
 
 ### Requirement: Calculate Historical Average and Trend
 The system SHALL calculate the historical weekly training volume average by grouping all past sessions by calendar week (Monday to Sunday, excluding the current week). The system SHALL compare the current week's training volume to this historical average to determine the trend.
