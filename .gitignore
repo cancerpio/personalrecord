@@ -107,3 +107,6 @@ implement-revert-point.txt
 
 # Internal LINE Documentation
 /internal/
+
+# Claude setting
+/.claude
