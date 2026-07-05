@@ -9,6 +9,17 @@ const sessionStore = useSessionStore();
 
 const volumeInfo = computed(() => sessionStore.weeklyTrainingVolumeInfo);
 
+// Trailing 16-week volume series for the bar chart
+const volume16 = computed(() => sessionStore.trailing16WeekVolumeInfo);
+const maxWeekVolume = computed(() => Math.max(1, ...volume16.value.weeks.map(w => w.volume)));
+const hoveredWeek = ref(null);
+const hoveredIndex = ref(0);
+const tipLeft = computed(() => {
+  const n = volume16.value.weeks.length;
+  return (n > 1 ? (hoveredIndex.value / (n - 1)) * 100 : 50) + '%';
+});
+function showWeek(w, i) { hoveredWeek.value = w; hoveredIndex.value = i; }
+
 // Default to an empty string initially, the watcher will populate it if exercises exist
 const filters = ref({
   exercise: '', 
@@ -202,8 +213,34 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- Past 16-week volume bar chart (iPhone Health style) -->
+      <div class="vol-chart-wrap">
+        <div class="vol-chart">
+          <div
+            v-for="(w, i) in volume16.weeks"
+            :key="w.monday"
+            class="vol-col"
+            :class="{ current: w.isCurrent }"
+            @mouseenter="showWeek(w, i)"
+            @mouseleave="hoveredWeek = null"
+            @click="showWeek(w, i)"
+          >
+            <div class="vol-bar" :style="{ height: (w.volume / maxWeekVolume * 100) + '%' }"></div>
+          </div>
+          <div class="vol-avg-line" :style="{ bottom: (volume16.average / maxWeekVolume * 100) + '%' }"></div>
+          <div class="vol-avg-tag" :style="{ bottom: (volume16.average / maxWeekVolume * 100) + '%' }">平均 {{ volume16.average.toLocaleString() }}</div>
+          <div v-if="hoveredWeek" class="vol-tip" :style="{ left: tipLeft }">
+            {{ hoveredWeek.rangeLabel }}<br><b>{{ hoveredWeek.volume.toLocaleString() }}</b> kg
+          </div>
+        </div>
+        <div class="vol-xaxis">
+          <span v-for="w in volume16.weeks" :key="w.monday">{{ w.monthLabel }}</span>
+        </div>
+      </div>
+
       <div class="volume-footer">
-        <span class="history-average">歷史每週平均容積：{{ volumeInfo.averageVolume.toLocaleString() }} kg</span>
+        <span class="history-average">過去 16 週平均：{{ volume16.average.toLocaleString() }} kg／週</span>
       </div>
     </div>
 
@@ -431,10 +468,10 @@ onMounted(() => {
 }
 
 .title-area h1 {
-  font-size: 34px;
+  font-size: 22px;
   font-weight: 800;
   margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
   background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-color) 100%);
   background-clip: text;
   -webkit-background-clip: text;
@@ -449,5 +486,97 @@ onMounted(() => {
   letter-spacing: 1px;
   font-weight: 600;
   margin-bottom: 4px;
+}
+
+/* ===== Past 16-week volume bar chart ===== */
+.vol-chart-wrap {
+  position: relative;
+  margin-top: 2px;
+}
+
+.vol-chart {
+  position: relative;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.vol-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+}
+
+.vol-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 2px 2px;
+  background: rgba(0, 122, 255, 0.4);
+  transition: background 0.15s ease;
+}
+
+.vol-col.current .vol-bar,
+.vol-col:hover .vol-bar {
+  background: var(--accent-color);
+}
+
+.vol-avg-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px dashed var(--text-secondary);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.vol-avg-tag {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--card-bg-blur);
+  padding: 0 4px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.vol-tip {
+  position: absolute;
+  top: -6px;
+  transform: translate(-50%, -100%);
+  background: rgba(30, 30, 32, 0.95);
+  color: #ffffff;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.vol-tip b {
+  font-variant-numeric: tabular-nums;
+}
+
+.vol-xaxis {
+  display: flex;
+  padding: 6px 1px 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.vol-xaxis span {
+  flex: 1;
+  text-align: center;
 }
 </style>
