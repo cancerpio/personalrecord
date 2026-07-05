@@ -79,6 +79,57 @@ export const useSessionStore = defineStore('session', {
             };
         },
 
+        // Trailing 16-week volume series for the dashboard bar chart.
+        // Returns a fixed-length (16) series ordered oldest -> current week,
+        // with missing weeks filled as 0, plus the 16-week average.
+        trailing16WeekVolumeInfo: (state) => {
+            const WEEKS = 16;
+
+            // Reuse the same weekly grouping as weeklyTrainingVolumeInfo.
+            const weeklyVolumes = {};
+            state.sessions.forEach(session => {
+                const dateStr = session.date;
+                if (!dateStr) return;
+                const monday = getMondayOfDate(dateStr);
+                const vol = (session.reps || 0) * (session.weight || 0);
+                weeklyVolumes[monday] = (weeklyVolumes[monday] || 0) + vol;
+            });
+
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const currentMonday = getMondayOfDate(todayStr);
+            const [cy, cm, cd] = currentMonday.split('-').map(Number);
+            const currentMondayDate = new Date(Date.UTC(cy, cm - 1, cd));
+
+            const weeks = [];
+            let prevMonth = null;
+            for (let i = WEEKS - 1; i >= 0; i--) {
+                const monday = new Date(currentMondayDate);
+                monday.setUTCDate(monday.getUTCDate() - i * 7);
+                const sunday = new Date(monday);
+                sunday.setUTCDate(sunday.getUTCDate() + 6);
+
+                const key = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+                const mo = monday.getUTCMonth() + 1;
+                // Sparse x-axis: label only the first shown week of each month.
+                const monthLabel = mo !== prevMonth ? `${mo}月` : '';
+                prevMonth = mo;
+
+                weeks.push({
+                    monday: key,
+                    volume: weeklyVolumes[key] || 0,
+                    monthLabel,
+                    rangeLabel: `${mo}/${monday.getUTCDate()}–${sunday.getUTCMonth() + 1}/${sunday.getUTCDate()}`,
+                    isCurrent: key === currentMonday
+                });
+            }
+
+            const total = weeks.reduce((sum, w) => sum + w.volume, 0);
+            const average = Math.round(total / WEEKS);
+
+            return { weeks, average };
+        },
+
         // Transforms data into [timestamp, weight] format for Highcharts
         getChartSeriesForExercise: (state) => (exerciseName, calculationType = 'PR', year = 'all', month = 'all') => {
             let filtered = state.sessions.filter(s => s.exercise === exerciseName);
