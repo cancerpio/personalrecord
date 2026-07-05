@@ -33,7 +33,7 @@ export const useSessionStore = defineStore('session', {
                 const dateStr = session.date;
                 if (!dateStr) return;
                 const monday = getMondayOfDate(dateStr);
-                const vol = (session.sets || 0) * (session.reps || 0) * (session.weight || 0);
+                const vol = (session.reps || 0) * (session.weight || 0);
                 weeklyVolumes[monday] = (weeklyVolumes[monday] || 0) + vol;
             });
 
