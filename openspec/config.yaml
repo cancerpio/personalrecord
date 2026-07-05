@@ -1,20 +1,21 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Project context (optional) — shown to AI when creating artifacts.
+context: |
+  Tech stack: Vue 3 (Composition API) + Pinia + Vite，部署到 GitHub Pages。
+  以 LINE LIFF mini-app 形式運行；圖表使用 Highcharts。
+  領域：個人重訓紀錄與分析（訓練容積、趨勢、PR）。
+  一筆 session 紀錄代表「一組(set)」，欄位為 { date, exercise, weight, reps }，沒有 sets 欄位。
+  輸出語言：所有敘述性內容一律使用繁體中文；結構關鍵字（Requirement/Scenario/WHEN/THEN/SHALL 等）保留原樣。
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+# Per-artifact rules (optional) — constraints applied when generating each artifact.
+rules:
+  proposal:
+    - 所有敘述性內容一律使用繁體中文撰寫。
+  design:
+    - 所有敘述性內容一律使用繁體中文撰寫。
+  specs:
+    - 敘述性文字使用繁體中文撰寫。
+    - 保留結構關鍵字原樣（Requirement:/Scenario:/WHEN/THEN/SHALL、delta 的 ADDED/MODIFIED/REMOVED）。
+  tasks:
+    - 所有任務描述一律使用繁體中文撰寫。
