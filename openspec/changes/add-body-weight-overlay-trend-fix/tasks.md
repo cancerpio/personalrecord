@@ -4,14 +4,14 @@
 - [x] 1.2 歷史平均改為「前期各週容積平均」；趨勢改以「上一完整週 vs 前期各週平均」判定（維持 ±5% 門檻）
 - [x] 1.3 邊界處理：只有一個完整週時回傳趨勢 STABLE（持平）；無完整週時維持既有無資料處理
 - [x] 1.4 保留當週即時容積（partial）作為 `currentVolume` 供標頭大數字使用，不參與趨勢計算
-- [ ] 1.5 更新既有 `weeklyTrainingVolumeInfo` 相關單元測試以反映新語意 ⚠️ 專案未設置前端測試框架（無 vitest/jest），改以自含式演算法驗證腳本確認（見 5.3）；需先決定是否引入測試框架
+- [x] 1.5 為 `weeklyTrainingVolumeInfo` 新語意補上單元測試（引入 vitest；涵蓋 2A 上升、週初低量仍上升、單一完整週→持平、首週）
 
 ## 2. 資料層：每週與當週平均體重
 
 - [x] 2.1 擴充 `trailing16WeekVolumeInfo`，為每一週新增 `avgBodyWeight`＝該週 `bodyWeight` 平均，無紀錄為 `null`（重用既有週分組與 `getMondayOfDate`）
 - [x] 2.2 提供「當週平均體重」＝當週 `bodyWeight` 平均，無紀錄以無資料狀態表示
 - [x] 2.3 提供「體重趨勢」＝以 2A（上一完整週 vs 前期各週平均）計算方向與變化量（kg），採建議門檻 ±0.3 kg；只有一個完整週時為持平
-- [ ] 2.4 為 2.1–2.3 補上單元測試（含缺值週為 null、當週平均、體重趨勢與門檻） ⚠️ 同 1.5，待決定測試框架；已用演算法驗證腳本涵蓋
+- [x] 2.4 為 2.1–2.3 補上單元測試（含缺值週為 null、當週平均、體重趨勢與門檻、多筆取平均）
 
 ## 3. 首頁標頭：雙欄配置
 
@@ -36,9 +36,9 @@
 ## 5. 驗證
 
 - [x] 5.1 對照視覺預覽確認外觀：無資料狀態已於實機瀏覽器 headless 截圖確認（標頭雙欄、圖例、月份軸、平均線、進行中、空狀態皆正確渲染，無 runtime 錯誤）；並修正 Highcharts 容器寬度撐爆卡片的 bug（min-width:0 + 掛載後 reflow）
-- [ ] 5.2 跑過既有與新增測試 ⚠️ 無測試框架；改以演算法驗證腳本 + 兩次 production build 通過替代
+- [x] 5.2 跑過新增測試：`npm test` → 8 tests passed（打在真實 store 程式碼上，mock api 以避開 @line/liff）；production build 亦通過
 - [x] 5.3 演算法驗證：以視覺稿相同資料驗算，2A 容積趨勢（上升 18%）、當週容積 4200、當週平均體重 78.0、體重趨勢方向、缺值週 `avgBodyWeight=null`、單一完整週→持平 全數 PASS；確認週初不再必然「下降」
 
 ## 備註：測試框架
 
-專案目前無前端測試框架（`package.json` scripts 僅 dev/build/preview）。1.5、2.4、5.2 的「單元測試」在缺乏框架下無法對既有程式碼直接執行；本次以自含式演算法驗證腳本（涵蓋 2A 與體重彙總的關鍵情境）＋ production build 佐證。是否引入 vitest 建立正式測試，待與需求方確認後再補。
+專案原無前端測試框架。本次引入 **vitest**（新增 `vitest.config.js`、`src/stores/sessionStore.test.js`，`package.json` 加 `test`/`test:watch`），對真實 store 程式碼測試 2A 趨勢與體重彙總的關鍵情境，`npm test` 共 8 個測試全數通過。
