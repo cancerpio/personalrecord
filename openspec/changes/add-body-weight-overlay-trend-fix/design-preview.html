@@ -1,0 +1,328 @@
+<title>16 週容積 × 週平均體重</title>
+<style>
+  :root {
+    --page-bg: #f2f2f7;
+    --card-bg: #ffffff;
+    --ink-1: #1c1c1e;
+    --ink-2: #6b7178;
+    --ink-3: #9aa0a6;
+    --sep: rgba(60,60,67,0.14);
+    --blue: #007AFF;
+    --blue-soft: rgba(0,122,255,0.30);
+    --orange: #D97706;
+    --avg: #8a8f98;
+    --grid: rgba(60,60,67,0.10);
+    --good-bg: rgba(52,199,89,0.15);
+    --good-fg: #248a3d;
+    --neutral-bg: rgba(120,120,128,0.14);
+    --neutral-fg: #6b7178;
+    --tip-bg: rgba(28,28,30,0.96);
+    --tip-fg: #ffffff;
+    --shadow: 0 10px 40px rgba(31,38,135,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #000000;
+      --card-bg: #1c1c1e;
+      --ink-1: #f5f5f7;
+      --ink-2: #9a9aa0;
+      --ink-3: #6b6b70;
+      --sep: rgba(120,120,128,0.28);
+      --blue: #0A84FF;
+      --blue-soft: rgba(10,132,255,0.32);
+      --orange: #FF9F0A;
+      --avg: #8e8e93;
+      --grid: rgba(120,120,128,0.18);
+      --good-bg: rgba(48,209,88,0.18);
+      --good-fg: #30d158;
+      --neutral-bg: rgba(120,120,128,0.24);
+      --neutral-fg: #c7c7cc;
+      --tip-bg: rgba(240,240,245,0.97);
+      --tip-fg: #1c1c1e;
+      --shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="light"] {
+    --page-bg: #f2f2f7; --card-bg: #ffffff; --ink-1: #1c1c1e; --ink-2: #6b7178; --ink-3: #9aa0a6;
+    --sep: rgba(60,60,67,0.14); --blue: #007AFF; --blue-soft: rgba(0,122,255,0.30); --orange: #D97706;
+    --avg: #8a8f98; --grid: rgba(60,60,67,0.10); --good-bg: rgba(52,199,89,0.15); --good-fg: #248a3d;
+    --neutral-bg: rgba(120,120,128,0.14); --neutral-fg: #6b7178;
+    --tip-bg: rgba(28,28,30,0.96); --tip-fg: #ffffff; --shadow: 0 10px 40px rgba(31,38,135,0.12);
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #000000; --card-bg: #1c1c1e; --ink-1: #f5f5f7; --ink-2: #9a9aa0; --ink-3: #6b6b70;
+    --sep: rgba(120,120,128,0.28); --blue: #0A84FF; --blue-soft: rgba(10,132,255,0.32); --orange: #FF9F0A;
+    --avg: #8e8e93; --grid: rgba(120,120,128,0.18); --good-bg: rgba(48,209,88,0.18); --good-fg: #30d158;
+    --neutral-bg: rgba(120,120,128,0.24); --neutral-fg: #c7c7cc;
+    --tip-bg: rgba(240,240,245,0.97); --tip-fg: #1c1c1e; --shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--ink-1);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 28px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    min-height: 100vh;
+  }
+  .page-title {
+    text-align: center;
+    max-width: 440px;
+  }
+  .page-title h1 { font-size: 17px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.2px; }
+  .page-title p { font-size: 12.5px; color: var(--ink-2); margin: 0; line-height: 1.5; }
+
+  /* ---- The card ---- */
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card-bg);
+    border-radius: 22px;
+    padding: 18px 18px 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .stats { display: flex; flex-direction: column; gap: 9px; }
+  .stat-pair { display: grid; grid-template-columns: 1fr 1fr; }
+  .stat-cell { display: flex; flex-direction: column; gap: 6px; padding-right: 16px; }
+  .stat-cell + .stat-cell { padding-left: 12px; padding-right: 0; align-items: flex-end; text-align: right; }
+  .stat-cell + .stat-cell .chip { align-self: flex-end; }
+  .head-label { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .head-label .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .head-value { font-size: 27px; font-weight: 800; margin: 0; letter-spacing: -0.5px; display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; color: var(--ink-1); }
+  .head-value .unit { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+
+  .chip {
+    align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    background: var(--good-bg); color: var(--good-fg); font-variant-numeric: tabular-nums;
+  }
+  .chip.neutral { background: var(--neutral-bg); color: var(--neutral-fg); }
+  .chip svg { width: 13px; height: 13px; }
+  .basis-note { font-size: 10.5px; color: var(--ink-3); line-height: 1.4; }
+
+  /* ---- Chart ---- */
+  .chart-wrap { position: relative; }
+  svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .axis-num { fill: var(--ink-3); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .axis-num.right { fill: var(--orange); opacity: 0.85; }
+  .xlabel { fill: var(--ink-2); font-size: 15px; font-weight: 500; }
+  .bar { fill: var(--blue-soft); transition: fill 0.15s ease; }
+  .bar.current { fill: rgba(0,122,255,0.10); stroke: var(--blue); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .bar.active { fill: var(--blue); stroke: none; }
+  .wip-label { fill: var(--blue); font-size: 13px; font-weight: 700; }
+  .avg-line { stroke: var(--avg); stroke-width: 2; stroke-dasharray: 6 5; opacity: 0.7; }
+  .avg-tag { fill: var(--ink-2); font-size: 14px; font-weight: 600; }
+  .bw-line { fill: none; stroke: var(--orange); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
+  .bw-dot { fill: var(--card-bg); stroke: var(--orange); stroke-width: 3.5; }
+  .hit { fill: transparent; cursor: pointer; }
+
+  .tip {
+    position: absolute; transform: translate(-50%, -100%);
+    background: var(--tip-bg); color: var(--tip-fg);
+    padding: 8px 11px; border-radius: 10px; font-size: 12px; line-height: 1.5;
+    white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.12s ease;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.28); z-index: 6; font-variant-numeric: tabular-nums;
+  }
+  .tip.show { opacity: 1; }
+  .tip .r { color: var(--ink-3, #9aa0a6); font-size: 11px; margin-bottom: 3px; }
+  .tip .row { display: flex; align-items: center; gap: 6px; }
+  .tip .sw { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .tip b { font-weight: 700; }
+
+  /* ---- Legend + footer ---- */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; padding-top: 2px; }
+  .lg { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+  .lg .box { width: 11px; height: 11px; border-radius: 3px; background: var(--blue); }
+  .lg .ln { width: 16px; height: 0; border-top: 3px solid var(--orange); border-radius: 2px; }
+  .lg .dash { width: 16px; height: 0; border-top: 2px dashed var(--avg); }
+  .footer { border-top: 1px solid var(--sep); padding-top: 10px; font-size: 12px; color: var(--ink-2); display: flex; justify-content: space-between; }
+
+  /* ---- Notes ---- */
+  .notes { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; }
+  .note {
+    background: var(--card-bg); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow); font-size: 12.5px; line-height: 1.6; color: var(--ink-2);
+  }
+  .note b { color: var(--ink-1); font-weight: 700; }
+  .note .tag {
+    display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px;
+    padding: 2px 8px; border-radius: 6px; background: var(--blue-soft); color: var(--blue);
+    margin-bottom: 6px;
+  }
+  .note .tag.t2 { background: rgba(217,119,6,0.16); color: var(--orange); }
+</style>
+
+<div class="page-title">
+  <h1>首頁容積卡片 — 新版設計預覽</h1>
+  <p>16 週訓練容積長條圖 ＋ 每週平均體重折線（雙軸對照）。示範資料，非真實數據。</p>
+</div>
+
+<div class="card">
+  <div class="stats">
+    <div class="stat-pair">
+      <!-- 訓練容積 -->
+      <div class="stat-cell">
+        <div class="head-label"><span class="swatch" style="background:var(--blue)"></span>當週訓練總容積</div>
+        <div class="head-value">4,200<span class="unit">kg</span></div>
+        <div class="chip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+          <span>上升 18%</span>
+        </div>
+      </div>
+      <!-- 平均體重 -->
+      <div class="stat-cell">
+        <div class="head-label"><span class="swatch" style="background:var(--orange)"></span>當週平均體重</div>
+        <div class="head-value">78.0<span class="unit">kg</span></div>
+        <div class="chip neutral">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+          <span>0.3 kg</span>
+        </div>
+      </div>
+    </div>
+    <div class="basis-note">趨勢基準：上一完整週 vs 前期各週平均</div>
+  </div>
+
+  <div class="chart-wrap" id="wrap">
+    <svg class="chart" id="svg" viewBox="0 0 760 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="16 週訓練容積與每週平均體重"></svg>
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <div class="legend">
+    <div class="lg"><span class="box"></span>週訓練容積</div>
+    <div class="lg"><span class="ln"></span>週平均體重</div>
+    <div class="lg"><span class="dash"></span>16 週平均容積</div>
+  </div>
+
+  <div class="footer">
+    <span>過去 16 週平均：11,200 kg／週</span>
+    <span>體重 76.0–78.3 kg</span>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <span class="tag t2">趨勢修正 · 2A</span><br>
+    徽章不再拿「本週到今天的部分加總」去比，改為 <b>上一個已結束的完整週</b> vs <b>更早各完整週的平均</b>——公平的完整週對完整週。上方大數字仍是當週即時容積（會隨本週累積變動），故加一行小字說明徽章基準，避免數字與徽章看起來打架。只有一個完整週時，趨勢直接顯示 <b>持平</b>。圖上<b>當週那根改成虛線 ghost + 「進行中」標示</b>——它是部分加總、天生偏矮，畫成實柱會被誤讀為容積驟降。
+  </div>
+  <div class="note">
+    <span class="tag">體重折線</span><br>
+    每週平均體重 = 該週（週一~週日）所有體重紀錄的平均，對齊同樣的 16 個週一。<b>某週無紀錄則折線斷開留空</b>（如圖中一處缺口），不補 0、不內插，誠實呈現量測空窗。右側橘色刻度為體重軸，不從 0 起算，並套用<b>最小跨度 8kg</b>（避免 ±0.3kg 水分雜訊被放大成假趨勢）與<b>最大跨度 50kg</b>（防體重打錯字的離群值撐爆軸）。</div>
+  <div class="note">
+    <span class="tag t2">標頭雙欄</span><br>
+    標頭改為<b>左右兩欄</b>：左＝當週訓練總容積、右＝當週平均體重，中間細線分隔，比上下堆疊更省空間、留給下方長條圖。趨勢改成掛在數字下的小 chip；基準文字兩者相同，抽成<b>底下一行共用小字</b>不重複。體重 chip 刻意用<b>中性灰</b>而非綠色——體重升降無好壞之分，只標方向與變化量（kg）。兩者趨勢基準皆採 2A（上一完整週 vs 前期平均）。
+  </div>
+</div>
+
+<script>
+  const volumes = [9200,10100,8800,11200,10500,12100,11800,9900,13200,12600,11100,13800,12900,14200,13600,4200];
+  const bw       = [76.2,76.4,76.0,76.6,76.3,76.8,77.1,null,77.4,77.2,77.6,77.9,78.1,77.8,78.3,78.0];
+  const N = volumes.length;
+  const AVG_VOL = 11200;
+  const CURRENT = N - 1;
+
+  // week range labels (Mondays, ending on the current week 2026-07-06)
+  const startMon = new Date(Date.UTC(2026,2,23)); // 2026-03-23
+  const labels = [], months = [];
+  let prevMonth = null;
+  for (let i=0;i<N;i++){
+    const mon = new Date(startMon); mon.setUTCDate(mon.getUTCDate()+i*7);
+    const sun = new Date(mon); sun.setUTCDate(sun.getUTCDate()+6);
+    labels.push(`${mon.getUTCMonth()+1}/${mon.getUTCDate()}–${sun.getUTCMonth()+1}/${sun.getUTCDate()}`);
+    const mo = mon.getUTCMonth()+1;
+    months.push(mo!==prevMonth ? `${mo}月` : '');
+    prevMonth = mo;
+  }
+
+  const VW=760, VH=300, ML=46, MR=44, MT=20, MB=40;
+  const plotW = VW-ML-MR, plotH = VH-MT-MB, base = MT+plotH;
+  const slot = plotW/N, barW = slot*0.58;
+  const VOL_MAX = 15000;
+  // 右軸套用最小跨度 8kg：資料 76.0–78.3（跨度 2.3kg）置中撐開到 8kg → 約 73–81
+  const BW_MIN = 73, BW_MAX = 81;
+  const yVol = v => base - (v/VOL_MAX)*plotH;
+  const yBw  = w => base - ((w-BW_MIN)/(BW_MAX-BW_MIN))*plotH;
+  const cx = i => ML + slot*i + slot/2;
+
+  const NS='http://www.w3.org/2000/svg';
+  const el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+  const svg=document.getElementById('svg');
+
+  // grid + left axis (volume)
+  [0,5000,10000,15000].forEach(v=>{
+    const y=yVol(v);
+    svg.appendChild(el('line',{class:'grid-line',x1:ML,y1:y,x2:VW-MR,y2:y}));
+    const t=el('text',{class:'axis-num',x:ML-8,y:y+5,'text-anchor':'end'});
+    t.textContent = v>=1000 ? (v/1000)+'k' : v;
+    svg.appendChild(t);
+  });
+  // right axis (body weight)
+  [74,76,78,80].forEach(w=>{
+    const y=yBw(w);
+    const t=el('text',{class:'axis-num right',x:VW-MR+8,y:y+5,'text-anchor':'start'});
+    t.textContent=w;
+    svg.appendChild(t);
+  });
+
+  // bars
+  volumes.forEach((v,i)=>{
+    const h=Math.max(base-yVol(v),2);
+    const r=el('rect',{class:'bar'+(i===CURRENT?' current':''),x:cx(i)-barW/2,y:yVol(v),width:barW,height:h,rx:6,'data-i':i});
+    svg.appendChild(r);
+  });
+  // 當週柱標示「進行中」
+  const wip=el('text',{class:'wip-label',x:cx(CURRENT),y:yVol(volumes[CURRENT])-8,'text-anchor':'middle'});
+  wip.textContent='進行中';
+  svg.appendChild(wip);
+
+  // average line + tag
+  const ya=yVol(AVG_VOL);
+  svg.appendChild(el('line',{class:'avg-line',x1:ML,y1:ya,x2:VW-MR,y2:ya}));
+  const at=el('text',{class:'avg-tag',x:VW-MR,y:ya-7,'text-anchor':'end'});
+  at.textContent='平均 11,200';
+  svg.appendChild(at);
+
+  // body-weight line, split into segments at nulls (break-at-gaps)
+  let seg=[];
+  const flush=()=>{ if(seg.length>1){ svg.appendChild(el('polyline',{class:'bw-line',points:seg.map(p=>p.join(',')).join(' ')})); } seg=[]; };
+  bw.forEach((w,i)=>{ if(w==null){flush();} else {seg.push([cx(i),yBw(w)]);} });
+  flush();
+  // dots
+  bw.forEach((w,i)=>{ if(w!=null) svg.appendChild(el('circle',{class:'bw-dot',cx:cx(i),cy:yBw(w),r:6})); });
+
+  // x labels
+  months.forEach((m,i)=>{ if(m){ const t=el('text',{class:'xlabel',x:cx(i),y:VH-14,'text-anchor':'middle'}); t.textContent=m; svg.appendChild(t);} });
+
+  // hit areas + tooltip
+  const tip=document.getElementById('tip'), wrap=document.getElementById('wrap');
+  volumes.forEach((v,i)=>{
+    const hit=el('rect',{class:'hit',x:ML+slot*i,y:MT,width:slot,height:plotH,'data-i':i});
+    svg.appendChild(hit);
+    hit.addEventListener('mouseenter',()=>show(i));
+    hit.addEventListener('mousemove',()=>show(i));
+    hit.addEventListener('mouseleave',()=>{ tip.classList.remove('show'); document.querySelectorAll('.bar.active').forEach(b=>b.classList.remove('active')); });
+  });
+  function show(i){
+    document.querySelectorAll('.bar.active').forEach(b=>b.classList.remove('active'));
+    const bar=svg.querySelector(`rect.bar[data-i="${i}"]`); if(bar) bar.classList.add('active');
+    const bwTxt = bw[i]==null ? '<span style="opacity:.6">體重：無紀錄</span>'
+      : `<div class="row"><span class="sw" style="background:var(--orange)"></span>體重 <b>${bw[i].toFixed(1)}</b> kg</div>`;
+    tip.innerHTML = `<div class="r">${labels[i]}${i===CURRENT?' · 本週進行中':''}</div>`
+      + `<div class="row"><span class="sw" style="background:var(--blue)"></span>容積 <b>${volumes[i].toLocaleString()}</b> kg</div>`
+      + bwTxt;
+    const pct = (ML+slot*i+slot/2)/VW*100;
+    tip.style.left = pct+'%';
+    tip.style.top = (MT/VH*100)+'%';
+    tip.classList.add('show');
+  }
+</script>
