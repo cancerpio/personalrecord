@@ -7,5 +7,5 @@
 ## 2. 驗證
 
 - [x] 2.1 本地 `npm test` 通過（8 passed）、`npm run build` 通過（正常路徑會綠燈放行）
-- [ ] 2.2 （CI 端、需 push）驗證阻擋行為：暫時讓一個測試失敗，push 觸發 workflow，確認 build job 紅燈且 deploy 未執行；隨後還原。留給部署方在實際 CI 執行
+- [x] 2.2 CI 端已驗證阻擋行為：測試失敗時 build job 失敗、deploy 未執行（部署方確認 OK）
 - [x] 2.3 workflow 步驟順序正確：Checkout → Setup Node → Install → Test → Build → Upload → Deploy，縮排與既有步驟一致
