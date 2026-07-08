@@ -38,7 +38,7 @@ describe('weeklyTrainingVolumeInfo — 趨勢 2A（完整週對完整週）', ()
 
     const info = store.weeklyTrainingVolumeInfo;
     expect(info.currentVolume).toBe(4200); // 當週即時（部分）容積作為大數字
-    expect(info.trend).toBe('usssp');
+    expect(info.trend).toBe('up');
     expect(info.trendPct).toBe(18);
   });
 
