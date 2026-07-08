@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, master, mini-app, feat/*, test/*] # Trigger on your current branch too
+    branches: [main, master, mini-app, "feat/**", "test/**"] # feat/** 可匹配巢狀分支如 feat/openspec/xxx
   workflow_dispatch:
 
 permissions:

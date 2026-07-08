@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import HistoryChart from '../components/HistoryChart.vue';
 import FilterControls from '../components/FilterControls.vue';
 import SparklineRow from '../components/SparklineRow.vue';
@@ -11,14 +11,182 @@ const volumeInfo = computed(() => sessionStore.weeklyTrainingVolumeInfo);
 
 // Trailing 16-week volume series for the bar chart
 const volume16 = computed(() => sessionStore.trailing16WeekVolumeInfo);
-const maxWeekVolume = computed(() => Math.max(1, ...volume16.value.weeks.map(w => w.volume)));
-const hoveredWeek = ref(null);
-const hoveredIndex = ref(0);
-const tipLeft = computed(() => {
-  const n = volume16.value.weeks.length;
-  return (n > 1 ? (hoveredIndex.value / (n - 1)) * 100 : 50) + '%';
+const hasAnyBodyWeight = computed(() => volume16.value.weeks.some(w => w.avgBodyWeight != null));
+
+// ---- 標頭雙欄摘要 ----
+const headerVolume = computed(() => volumeInfo.value.currentVolume.toLocaleString());
+const volTrendLabel = computed(() => {
+  const info = volumeInfo.value;
+  if ((info.trend === 'up' || info.trend === 'down') && info.trendPct != null) {
+    return `${info.statusLabel} ${Math.abs(info.trendPct)}%`;
+  }
+  return info.statusLabel;
 });
-function showWeek(w, i) { hoveredWeek.value = w; hoveredIndex.value = i; }
+const headerBodyWeight = computed(() =>
+  volumeInfo.value.currentBodyWeight != null ? volumeInfo.value.currentBodyWeight.toFixed(1) : null
+);
+const bwTrendLabel = computed(() => {
+  const info = volumeInfo.value;
+  if (info.bodyWeightTrend === 'none' || info.bodyWeightDelta == null) return '—';
+  return `${Math.abs(info.bodyWeightDelta).toFixed(1)} kg`;
+});
+
+// ---- 主題偵測（供 Highcharts 顏色使用；CSS 變數無法套用在 SVG fill 屬性上）----
+const isDark = ref(false);
+function detectDark() {
+  const attr = document.documentElement.getAttribute('data-theme');
+  if (attr === 'dark') return true;
+  if (attr === 'light') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+let mql = null;
+let themeObserver = null;
+const onSchemeChange = () => { isDark.value = detectDark(); };
+onMounted(() => {
+  isDark.value = detectDark();
+  mql = window.matchMedia('(prefers-color-scheme: dark)');
+  mql.addEventListener('change', onSchemeChange);
+  themeObserver = new MutationObserver(onSchemeChange);
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  // Highcharts 在初次量測若容器寬度未定會退回預設 600px；強制一次 reflow 對齊實際寬度
+  nextTick(() => window.dispatchEvent(new Event('resize')));
+});
+onUnmounted(() => {
+  if (mql) mql.removeEventListener('change', onSchemeChange);
+  if (themeObserver) themeObserver.disconnect();
+});
+
+// ---- 16 週容積 + 每週平均體重 combo 圖 ----
+const volumeChartOptions = computed(() => {
+  const weeks = volume16.value.weeks;
+  const dark = isDark.value;
+  const blue = dark ? '#0A84FF' : '#007AFF';
+  const blueSoft = dark ? 'rgba(10,132,255,0.38)' : 'rgba(0,122,255,0.32)';
+  const orange = dark ? '#FF9F0A' : '#D97706';
+  const ghostFill = dark ? 'rgba(10,132,255,0.14)' : 'rgba(0,122,255,0.10)';
+  const muted = dark ? '#98989E' : '#8E8E93';
+  const avg = volume16.value.average;
+
+  const volumeData = weeks.map(w => {
+    if (w.isCurrent) {
+      // 當週為部分加總 → ghost 樣式 + 「進行中」標示，避免被誤讀為驟降
+      return {
+        y: w.volume,
+        color: ghostFill,
+        borderColor: blue,
+        borderWidth: 1.5,
+        dashStyle: 'Dash',
+        dataLabels: {
+          enabled: true,
+          format: '進行中',
+          y: -2,
+          style: { color: blue, fontSize: '10px', fontWeight: '700', textOutline: 'none' }
+        }
+      };
+    }
+    return { y: w.volume, color: blueSoft };
+  });
+  const bwData = weeks.map(w => (w.avgBodyWeight != null ? Number(w.avgBodyWeight.toFixed(1)) : null));
+
+  // 右軸範圍策略：最小跨度 8kg（防雜訊放大）、最大跨度 50kg（防離群值撐爆）
+  const bwVals = weeks.map(w => w.avgBodyWeight).filter(v => v != null);
+  let bwAxisMin, bwAxisMax;
+  if (bwVals.length) {
+    let lo = Math.min(...bwVals) - 0.5;
+    let hi = Math.max(...bwVals) + 0.5;
+    const span = hi - lo;
+    const MIN_SPAN = 8, MAX_SPAN = 50;
+    const mid = (lo + hi) / 2;
+    if (span < MIN_SPAN) { lo = mid - MIN_SPAN / 2; hi = mid + MIN_SPAN / 2; }
+    else if (span > MAX_SPAN) { lo = mid - MAX_SPAN / 2; hi = mid + MAX_SPAN / 2; }
+    bwAxisMin = lo;
+    bwAxisMax = hi;
+  }
+
+  return {
+    chart: {
+      backgroundColor: 'transparent',
+      height: 210,
+      spacing: [18, 6, 4, 6],
+      style: { fontFamily: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif' }
+    },
+    title: { text: null },
+    credits: { enabled: false },
+    xAxis: {
+      categories: weeks.map(w => w.monthLabel),
+      lineColor: 'var(--glass-border)',
+      tickWidth: 0,
+      labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' } }
+    },
+    yAxis: [
+      {
+        title: { text: null },
+        min: 0,
+        gridLineColor: 'var(--glass-border)',
+        labels: { enabled: false },
+        plotLines: [{
+          value: avg,
+          color: muted,
+          dashStyle: 'Dash',
+          width: 1.5,
+          zIndex: 3,
+          label: {
+            text: `平均 ${avg.toLocaleString()}`,
+            align: 'right',
+            y: -4,
+            style: { color: muted, fontSize: '10px', fontWeight: '600' }
+          }
+        }]
+      },
+      {
+        title: { text: null },
+        opposite: true,
+        gridLineWidth: 0,
+        min: bwAxisMin,
+        max: bwAxisMax,
+        labels: { style: { color: orange, fontSize: '10px', fontWeight: '600' }, format: '{value:.0f}' }
+      }
+    ],
+    legend: {
+      enabled: true,
+      itemStyle: { color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '11px' },
+      symbolRadius: 2
+    },
+    tooltip: {
+      useHTML: true,
+      shared: true,
+      backgroundColor: dark ? 'rgba(240,240,245,0.97)' : 'rgba(28,28,30,0.96)',
+      style: { color: dark ? '#1c1c1e' : '#ffffff', fontSize: '12px' },
+      borderWidth: 0,
+      borderRadius: 10,
+      shadow: true,
+      formatter() {
+        const i = (this.points && this.points.length) ? this.points[0].point.index : this.point.index;
+        const w = weeks[i];
+        if (!w) return '';
+        const bwLine = w.avgBodyWeight != null
+          ? `體重：<b>${w.avgBodyWeight.toFixed(1)}</b> kg`
+          : '體重：無紀錄';
+        return `<div style="font-size:11px;opacity:.7;margin-bottom:2px">${w.rangeLabel}${w.isCurrent ? ' · 本週進行中' : ''}</div>`
+          + `容積：<b>${w.volume.toLocaleString()}</b> kg<br/>${bwLine}`;
+      }
+    },
+    plotOptions: {
+      column: { borderRadius: 4, pointPadding: 0.08, groupPadding: 0.06, borderWidth: 0 },
+      line: {
+        connectNulls: false,
+        lineWidth: 2.5,
+        color: orange,
+        marker: { enabled: true, radius: 3.5, symbol: 'circle' },
+        zIndex: 4
+      }
+    },
+    series: [
+      { name: '週容積', type: 'column', yAxis: 0, data: volumeData, color: blueSoft },
+      { name: '週平均體重', type: 'line', yAxis: 1, data: bwData }
+    ]
+  };
+});
 
 // Default to an empty string initially, the watcher will populate it if exercises exist
 const filters = ref({
@@ -180,63 +348,40 @@ onMounted(() => {
 
     <!-- Weekly Training Volume Card -->
     <div v-if="volumeInfo" class="volume-card glass-panel" :class="{ refreshing: loading }">
-      <div class="volume-header">
-        <div class="volume-title-group">
-          <span class="volume-label">當週訓練總容積</span>
-          <h2 class="volume-value">
-            {{ volumeInfo.currentVolume.toLocaleString() }}
-            <span class="unit">kg</span>
-          </h2>
-        </div>
-        <div class="volume-trend" :class="volumeInfo.trend">
-          <div class="trend-badge">
-            <!-- UP ARROW -->
-            <svg v-if="volumeInfo.trend === 'up'" class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-              <polyline points="17 6 23 6 23 12"></polyline>
-            </svg>
-            <!-- DOWN ARROW -->
-            <svg v-else-if="volumeInfo.trend === 'down'" class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
-              <polyline points="17 18 23 18 23 12"></polyline>
-            </svg>
-            <!-- STABLE LINE -->
-            <svg v-else-if="volumeInfo.trend === 'stable'" class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-              <polyline points="15 5 22 12 15 19"></polyline>
-            </svg>
-            <!-- NO TREND / DATA -->
-            <svg v-else class="trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span class="trend-text">{{ volumeInfo.statusLabel }}</span>
+      <!-- 標頭：左右兩欄（容積 | 平均體重） -->
+      <div class="stats">
+        <div class="stat-pair">
+          <!-- 訓練容積 -->
+          <div class="stat-cell">
+            <div class="head-label"><span class="swatch vol"></span>當週訓練總容積</div>
+            <h2 class="head-value">{{ headerVolume }}<span class="unit">kg</span></h2>
+            <div class="chip" :class="volumeInfo.trend">
+              <svg v-if="volumeInfo.trend === 'up'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+              <svg v-else-if="volumeInfo.trend === 'down'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>{{ volTrendLabel }}</span>
+            </div>
+          </div>
+          <!-- 平均體重 -->
+          <div class="stat-cell">
+            <div class="head-label"><span class="swatch bw"></span>當週平均體重</div>
+            <h2 v-if="headerBodyWeight != null" class="head-value">{{ headerBodyWeight }}<span class="unit">kg</span></h2>
+            <h2 v-else class="head-value muted">尚無體重紀錄</h2>
+            <div class="chip neutral" :class="volumeInfo.bodyWeightTrend">
+              <svg v-if="volumeInfo.bodyWeightTrend === 'up'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+              <svg v-else-if="volumeInfo.bodyWeightTrend === 'down'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>{{ bwTrendLabel }}</span>
+            </div>
           </div>
         </div>
+        <div class="basis-note">趨勢基準：上一完整週 vs 前期各週平均</div>
       </div>
 
-      <!-- Past 16-week volume bar chart (iPhone Health style) -->
+      <!-- 過去 16 週容積長條 + 每週平均體重折線（Highcharts combo） -->
       <div class="vol-chart-wrap">
-        <div class="vol-chart">
-          <div
-            v-for="(w, i) in volume16.weeks"
-            :key="w.monday"
-            class="vol-col"
-            :class="{ current: w.isCurrent }"
-            @mouseenter="showWeek(w, i)"
-            @mouseleave="hoveredWeek = null"
-            @click="showWeek(w, i)"
-          >
-            <div class="vol-bar" :style="{ height: (w.volume / maxWeekVolume * 100) + '%' }"></div>
-          </div>
-          <div class="vol-avg-line" :style="{ bottom: (volume16.average / maxWeekVolume * 100) + '%' }"></div>
-          <div class="vol-avg-tag" :style="{ bottom: (volume16.average / maxWeekVolume * 100) + '%' }">平均 {{ volume16.average.toLocaleString() }}</div>
-          <div v-if="hoveredWeek" class="vol-tip" :style="{ left: tipLeft }">
-            {{ hoveredWeek.rangeLabel }}<br><b>{{ hoveredWeek.volume.toLocaleString() }}</b> kg
-          </div>
-        </div>
-        <div class="vol-xaxis">
-          <span v-for="w in volume16.weeks" :key="w.monday">{{ w.monthLabel }}</span>
-        </div>
+        <highcharts class="vol-hc" :options="volumeChartOptions"></highcharts>
+        <p v-if="!hasAnyBodyWeight" class="bw-empty">記錄體重即可與訓練量對照</p>
       </div>
 
       <div class="volume-footer">
@@ -293,6 +438,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   margin-top: 4px;
+  min-width: 0;
   transition: opacity 0.3s ease;
 }
 
@@ -301,81 +447,115 @@ onMounted(() => {
   pointer-events: none;
 }
 
-.volume-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.volume-title-group {
+/* ===== 標頭雙欄摘要 ===== */
+.stats {
   display: flex;
   flex-direction: column;
+  gap: 9px;
 }
 
-.volume-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  letter-spacing: 0.5px;
+.stat-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 12px;
+  min-width: 0;
+}
+
+.stat-cell + .stat-cell {
+  padding-left: 12px;
+  padding-right: 0;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.stat-cell + .stat-cell .chip {
+  align-self: flex-end;
+}
+
+.head-label {
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.volume-value {
-  font-size: 28px;
+.head-label .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.head-label .swatch.vol { background: var(--accent-color); }
+.head-label .swatch.bw { background: #d97706; }
+
+.head-value {
+  font-size: 27px;
   font-weight: 800;
-  margin: 4px 0 0 0;
+  margin: 0;
+  letter-spacing: -0.5px;
   color: var(--text-primary);
   display: flex;
   align-items: baseline;
   gap: 4px;
 }
 
-.volume-value .unit {
-  font-size: 14px;
+.head-value.muted {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.head-value .unit {
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
 }
 
-.volume-trend {
-  display: flex;
+.chip {
+  align-self: flex-start;
+  display: inline-flex;
   align-items: center;
-}
-
-.trend-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 3px 9px;
   border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
-.volume-trend.up .trend-badge {
-  background: rgba(52, 199, 89, 0.15);
-  color: #34c759;
-}
+.chip svg { width: 13px; height: 13px; }
 
-.volume-trend.down .trend-badge {
-  background: rgba(255, 59, 48, 0.15);
-  color: #ff3b30;
-}
+/* 容積 chip：好壞語意色 */
+.chip.up { background: rgba(52, 199, 89, 0.15); color: #34c759; }
+.chip.down { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
+.chip.stable { background: rgba(255, 149, 0, 0.15); color: #ff9500; }
+.chip.none { background: rgba(142, 142, 147, 0.15); color: var(--text-secondary); }
 
-.volume-trend.stable .trend-badge {
-  background: rgba(255, 149, 0, 0.15);
-  color: #ff9500;
-}
-
-.volume-trend.none .trend-badge {
-  background: rgba(142, 142, 147, 0.15);
+/* 體重 chip：一律中性灰（升降無好壞之分），覆蓋上面的語意色 */
+.chip.neutral,
+.chip.neutral.up,
+.chip.neutral.down,
+.chip.neutral.stable,
+.chip.neutral.none {
+  background: rgba(142, 142, 147, 0.16);
   color: var(--text-secondary);
 }
 
-.trend-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.5;
+.basis-note {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  opacity: 0.75;
+  line-height: 1.4;
 }
 
 .volume-footer {
@@ -488,95 +668,31 @@ onMounted(() => {
   margin-bottom: 4px;
 }
 
-/* ===== Past 16-week volume bar chart ===== */
+/* ===== 16 週容積 + 體重 combo 圖 ===== */
 .vol-chart-wrap {
   position: relative;
   margin-top: 2px;
-}
-
-.vol-chart {
-  position: relative;
-  height: 120px;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  border-bottom: 1px solid var(--separator-color);
-}
-
-.vol-col {
-  flex: 1;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  cursor: pointer;
-}
-
-.vol-bar {
   width: 100%;
-  min-height: 2px;
-  border-radius: 4px 4px 2px 2px;
-  background: rgba(0, 122, 255, 0.4);
-  transition: background 0.15s ease;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.vol-col.current .vol-bar,
-.vol-col:hover .vol-bar {
-  background: var(--accent-color);
+.vol-hc {
+  width: 100%;
+  min-width: 0;
+  display: block;
 }
 
-.vol-avg-line {
+.bw-empty {
   position: absolute;
-  left: 0;
-  right: 0;
-  border-top: 1.5px dashed var(--text-secondary);
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.vol-avg-tag {
-  position: absolute;
-  right: 0;
-  transform: translateY(-50%);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--card-bg-blur);
-  padding: 0 4px;
-  border-radius: 6px;
-  pointer-events: none;
-}
-
-.vol-tip {
-  position: absolute;
-  top: -6px;
-  transform: translate(-50%, -100%);
-  background: rgba(30, 30, 32, 0.95);
-  color: #ffffff;
-  padding: 5px 8px;
-  border-radius: 8px;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  margin: 0;
   font-size: 11px;
-  line-height: 1.35;
-  white-space: nowrap;
-  text-align: center;
-  pointer-events: none;
-  z-index: 5;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-}
-
-.vol-tip b {
-  font-variant-numeric: tabular-nums;
-}
-
-.vol-xaxis {
-  display: flex;
-  padding: 6px 1px 0;
-  font-size: 10px;
   color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.vol-xaxis span {
-  flex: 1;
-  text-align: center;
+  opacity: 0.7;
+  pointer-events: none;
+  white-space: nowrap;
 }
 </style>

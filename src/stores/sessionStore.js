@@ -12,6 +12,25 @@ function getMondayOfDate(dateStr) {
     return `${monday.getUTCFullYear()}-${mm}-${dd}`;
 }
 
+// 依週分組計算每週平均體重（沿用相同的 UTC 週邊界）。
+// 回傳 { '<週一>': 平均體重 }，僅包含有紀錄的週。
+function getWeeklyBodyWeightAverages(bodyMetrics) {
+    const sums = {};
+    (bodyMetrics || []).forEach(m => {
+        if (!m || !m.date) return;
+        if (m.bodyWeight === undefined || m.bodyWeight === null || m.bodyWeight === '') return;
+        const bw = Number(m.bodyWeight);
+        if (Number.isNaN(bw)) return;
+        const monday = getMondayOfDate(m.date);
+        if (!sums[monday]) sums[monday] = { sum: 0, count: 0 };
+        sums[monday].sum += bw;
+        sums[monday].count += 1;
+    });
+    const avgs = {};
+    Object.keys(sums).forEach(k => { avgs[k] = sums[k].sum / sums[k].count; });
+    return avgs;
+}
+
 export const useSessionStore = defineStore('session', {
     state: () => ({
         sessions: [],
@@ -46,36 +65,81 @@ export const useSessionStore = defineStore('session', {
 
             const currentVolume = weeklyVolumes[currentMonday] || 0;
 
-            const pastWeeks = Object.keys(weeklyVolumes).filter(monday => monday !== currentMonday);
-            let averageVolume = 0;
-            if (pastWeeks.length > 0) {
-                const totalPastVolume = pastWeeks.reduce((sum, monday) => sum + weeklyVolumes[monday], 0);
-                averageVolume = Math.round(totalPastVolume / pastWeeks.length);
-            }
+            // 方案 2A：以「上一完整週」對「前期各週平均」判定趨勢，
+            // 而非拿當週的部分加總去比。完整週＝有紀錄且非當週的各週。
+            const completeWeeks = Object.keys(weeklyVolumes)
+                .filter(monday => monday !== currentMonday)
+                .sort(); // YYYY-MM-DD 補零，字典序即時間序
 
+            let averageVolume = 0;
             let trend = 'none';
             let statusLabel = '—';
-            if (pastWeeks.length > 0) {
-                if (currentVolume > averageVolume * 1.05) {
+            let trendPct = null;
+
+            if (completeWeeks.length === 0) {
+                // 完全沒有完整週，維持既有無資料處理
+                trend = currentVolume > 0 ? 'up' : 'none';
+                statusLabel = currentVolume > 0 ? '首週訓練中' : '—';
+            } else if (completeWeeks.length === 1) {
+                // 只有一個完整週：無前期可構成平均 → 持平
+                averageVolume = weeklyVolumes[completeWeeks[0]];
+                trend = 'stable';
+                statusLabel = '持平';
+                trendPct = 0;
+            } else {
+                const lastComplete = completeWeeks[completeWeeks.length - 1];
+                const priorWeeks = completeWeeks.slice(0, -1);
+                const lastVolume = weeklyVolumes[lastComplete];
+                averageVolume = Math.round(
+                    priorWeeks.reduce((sum, monday) => sum + weeklyVolumes[monday], 0) / priorWeeks.length
+                );
+                trendPct = averageVolume > 0 ? Math.round((lastVolume / averageVolume - 1) * 100) : null;
+                if (lastVolume > averageVolume * 1.05) {
                     trend = 'up';
                     statusLabel = '上升';
-                } else if (currentVolume < averageVolume * 0.95) {
+                } else if (lastVolume < averageVolume * 0.95) {
                     trend = 'down';
                     statusLabel = '下降';
                 } else {
                     trend = 'stable';
                     statusLabel = '持平';
                 }
-            } else {
-                trend = currentVolume > 0 ? 'up' : 'none';
-                statusLabel = currentVolume > 0 ? '首週訓練中' : '—';
+            }
+
+            // 每週平均體重：當週摘要與趨勢（同採 2A，門檻改用絕對量 ±0.3kg）
+            const BW_THRESHOLD = 0.3;
+            const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
+            const currentBodyWeight = weeklyBW[currentMonday] !== undefined ? weeklyBW[currentMonday] : null;
+
+            const completeBWWeeks = Object.keys(weeklyBW)
+                .filter(monday => monday !== currentMonday)
+                .sort();
+
+            let bodyWeightTrend = 'none';
+            let bodyWeightDelta = null;
+            if (completeBWWeeks.length === 1) {
+                bodyWeightTrend = 'stable';
+                bodyWeightDelta = 0;
+            } else if (completeBWWeeks.length > 1) {
+                const lastBWKey = completeBWWeeks[completeBWWeeks.length - 1];
+                const priorBWWeeks = completeBWWeeks.slice(0, -1);
+                const lastBW = weeklyBW[lastBWKey];
+                const avgBW = priorBWWeeks.reduce((sum, monday) => sum + weeklyBW[monday], 0) / priorBWWeeks.length;
+                bodyWeightDelta = lastBW - avgBW;
+                if (bodyWeightDelta > BW_THRESHOLD) bodyWeightTrend = 'up';
+                else if (bodyWeightDelta < -BW_THRESHOLD) bodyWeightTrend = 'down';
+                else bodyWeightTrend = 'stable';
             }
 
             return {
                 currentVolume,
                 averageVolume,
                 trend,
-                statusLabel
+                statusLabel,
+                trendPct,
+                currentBodyWeight,
+                bodyWeightTrend,
+                bodyWeightDelta
             };
         },
 
@@ -94,6 +158,8 @@ export const useSessionStore = defineStore('session', {
                 const vol = (session.reps || 0) * (session.weight || 0);
                 weeklyVolumes[monday] = (weeklyVolumes[monday] || 0) + vol;
             });
+
+            const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
 
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -118,6 +184,8 @@ export const useSessionStore = defineStore('session', {
                 weeks.push({
                     monday: key,
                     volume: weeklyVolumes[key] || 0,
+                    // 該週平均體重；無紀錄為 null（不補 0、不內插）
+                    avgBodyWeight: weeklyBW[key] !== undefined ? weeklyBW[key] : null,
                     monthLabel,
                     rangeLabel: `${mo}/${monday.getUTCDate()}–${sunday.getUTCMonth() + 1}/${sunday.getUTCDate()}`,
                     isCurrent: key === currentMonday
