@@ -9,9 +9,9 @@ const sessionStore = useSessionStore();
 
 const volumeInfo = computed(() => sessionStore.weeklyTrainingVolumeInfo);
 
-// Trailing 16-week volume series for the bar chart
-const volume16 = computed(() => sessionStore.trailing16WeekVolumeInfo);
-const hasAnyBodyWeight = computed(() => volume16.value.weeks.some(w => w.avgBodyWeight != null));
+// Trailing 12-week volume series for the bar chart
+const volume12 = computed(() => sessionStore.trailing12WeekVolumeInfo);
+const hasAnyBodyWeight = computed(() => volume12.value.weeks.some(w => w.avgBodyWeight != null));
 
 // ---- 標頭雙欄摘要 ----
 const headerVolume = computed(() => volumeInfo.value.currentVolume.toLocaleString());
@@ -56,16 +56,16 @@ onUnmounted(() => {
   if (themeObserver) themeObserver.disconnect();
 });
 
-// ---- 16 週容積 + 每週平均體重 combo 圖 ----
+// ---- 12 週容積 + 每週平均體重 combo 圖 ----
 const volumeChartOptions = computed(() => {
-  const weeks = volume16.value.weeks;
+  const weeks = volume12.value.weeks;
   const dark = isDark.value;
   const blue = dark ? '#0A84FF' : '#007AFF';
   const blueSoft = dark ? 'rgba(10,132,255,0.38)' : 'rgba(0,122,255,0.32)';
   const orange = dark ? '#FF9F0A' : '#D97706';
   const ghostFill = dark ? 'rgba(10,132,255,0.14)' : 'rgba(0,122,255,0.10)';
   const muted = dark ? '#98989E' : '#8E8E93';
-  const avg = volume16.value.average;
+  const avg = volume12.value.average;
 
   const volumeData = weeks.map(w => {
     if (w.isCurrent) {
@@ -378,14 +378,14 @@ onMounted(() => {
         <div class="basis-note">趨勢基準：上一完整週 vs 前期各週平均</div>
       </div>
 
-      <!-- 過去 16 週容積長條 + 每週平均體重折線（Highcharts combo） -->
+      <!-- 過去 12 週容積長條 + 每週平均體重折線（Highcharts combo） -->
       <div class="vol-chart-wrap">
         <highcharts class="vol-hc" :options="volumeChartOptions"></highcharts>
         <p v-if="!hasAnyBodyWeight" class="bw-empty">記錄體重即可與訓練量對照</p>
       </div>
 
       <div class="volume-footer">
-        <span class="history-average">過去 16 週平均：{{ volume16.average.toLocaleString() }} kg／週</span>
+        <span class="history-average">過去 12 週平均：{{ volume12.average.toLocaleString() }} kg／週</span>
       </div>
     </div>
 
@@ -668,7 +668,7 @@ onMounted(() => {
   margin-bottom: 4px;
 }
 
-/* ===== 16 週容積 + 體重 combo 圖 ===== */
+/* ===== 12 週容積 + 體重 combo 圖 ===== */
 .vol-chart-wrap {
   position: relative;
   margin-top: 2px;

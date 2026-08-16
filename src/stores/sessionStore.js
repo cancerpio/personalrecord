@@ -143,11 +143,11 @@ export const useSessionStore = defineStore('session', {
             };
         },
 
-        // Trailing 16-week volume series for the dashboard bar chart.
-        // Returns a fixed-length (16) series ordered oldest -> current week,
-        // with missing weeks filled as 0, plus the 16-week average.
-        trailing16WeekVolumeInfo: (state) => {
-            const WEEKS = 16;
+        // Trailing 12-week volume series for the dashboard bar chart.
+        // Returns a fixed-length (12) series ordered oldest -> current week,
+        // with missing weeks filled as 0, plus the 12-week average.
+        trailing12WeekVolumeInfo: (state) => {
+            const WEEKS = 12;
 
             // Reuse the same weekly grouping as weeklyTrainingVolumeInfo.
             const weeklyVolumes = {};

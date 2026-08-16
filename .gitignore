@@ -110,3 +110,5 @@ implement-revert-point.txt
 
 # Claude setting
 /.claude
+# Superpowers SDD scratch ledger
+.superpowers/

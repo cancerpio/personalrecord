@@ -97,7 +97,7 @@ describe('weeklyTrainingVolumeInfo — 當週平均體重與體重趨勢', () =>
   });
 });
 
-describe('trailing16WeekVolumeInfo — 每週平均體重', () => {
+describe('trailing12WeekVolumeInfo — 每週平均體重', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
@@ -105,18 +105,18 @@ describe('trailing16WeekVolumeInfo — 每週平均體重', () => {
   });
   afterEach(() => { vi.useRealTimers(); });
 
-  it('固定 16 筆、缺值週為 null、當週 avgBodyWeight 正確', () => {
+  it('固定 12 筆、缺值週為 null、當週 avgBodyWeight 正確', () => {
     const store = useSessionStore();
     const { sessions, body } = buildDataset();
     store.sessions = sessions;
     store.bodyMetrics = body;
 
-    const t = store.trailing16WeekVolumeInfo;
-    expect(t.weeks).toHaveLength(16);
-    expect(t.weeks[7].avgBodyWeight).toBeNull();       // 第 8 週（index 7）無體重紀錄
-    expect(t.weeks[15].isCurrent).toBe(true);
-    expect(t.weeks[15].avgBodyWeight).toBeCloseTo(78.0, 5);
-    expect(t.weeks[0].avgBodyWeight).toBeCloseTo(76.2, 5);
+    const t = store.trailing12WeekVolumeInfo;
+    expect(t.weeks).toHaveLength(12);
+    expect(t.weeks[3].avgBodyWeight).toBeNull();       // 原第 8 週（16週index 7）→ 12週index 3，無體重紀錄
+    expect(t.weeks[11].isCurrent).toBe(true);
+    expect(t.weeks[11].avgBodyWeight).toBeCloseTo(78.0, 5);
+    expect(t.weeks[0].avgBodyWeight).toBeCloseTo(76.3, 5); // 新視窗最舊週＝原 index 4（bws[4]=76.3）
   });
 
   it('該週多筆體重取平均', () => {
@@ -125,7 +125,7 @@ describe('trailing16WeekVolumeInfo — 每週平均體重', () => {
       { id: '1', date: '2026-06-29', bodyWeight: 77.8 },
       { id: '2', date: '2026-07-01', bodyWeight: 78.2 }
     ];
-    const t = store.trailing16WeekVolumeInfo;
+    const t = store.trailing12WeekVolumeInfo;
     const wk = t.weeks.find(w => w.monday === '2026-06-29');
     expect(wk.avgBodyWeight).toBeCloseTo(78.0, 5); // (77.8 + 78.2) / 2
   });
