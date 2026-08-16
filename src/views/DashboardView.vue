@@ -375,7 +375,7 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <div class="basis-note">趨勢基準：上一完整週 vs 前期各週平均</div>
+        <div class="basis-note">趨勢基準：當週總量 vs 過往完整週平均</div>
       </div>
 
       <!-- 過去 12 週容積長條 + 每週平均體重折線（Highcharts combo） -->

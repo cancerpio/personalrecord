@@ -32,54 +32,53 @@ This capability calculates and tracks the weekly training volume and provides co
 - **THEN** it SHALL be grouped into the training week beginning Monday 2026-06-29
 
 ### Requirement: Calculate Historical Average and Trend
-系統 SHALL 以「完整週對完整週」的方式判定趨勢，避免拿當週的部分加總（週一到當日）去和過去完整週相比。
+系統 SHALL 以「當週即時總量」對「過往完整週平均」的方式判定趨勢。當週即時總量即為畫面上的當週訓練總容積（週一到當日的部分加總），也就是被比較的值本身。
 
 定義：
 - 「有訓練紀錄且非當週」的各週稱為「完整週」。
-- 其中日期最新的一週為「上一完整週（last complete week）」。
-- 其餘完整週為「前期各週（prior weeks）」；歷史平均 SHALL 為前期各週容積的平均。
+- 歷史平均 SHALL 為所有完整週容積的算術平均。
 
-系統 SHALL 以「上一完整週容積」對「前期各週平均」判定趨勢，門檻維持 ±5%：
-- 上一完整週容積 > 平均 105% SHALL 判定為 "UP"（上升）。
-- 上一完整週容積 < 平均 95% SHALL 判定為 "DOWN"（下降）。
+系統 SHALL 以「當週即時總量」對「完整週平均」判定趨勢，門檻維持 ±5%：
+- 當週總量 > 平均 105% SHALL 判定為 "UP"（上升）。
+- 當週總量 < 平均 95% SHALL 判定為 "DOWN"（下降）。
 - 介於 95%～105%（含）之間 SHALL 判定為 "STABLE"（持平）。
 
-當僅有一個完整週（即無前期各週可構成平均）時，趨勢 SHALL 顯示為 "STABLE"（持平）。當完全沒有完整週時，維持既有的無資料處理。
+當存在至少一個完整週時，系統 SHALL 直接以當週總量與完整週平均比較（即使只有一個完整週，也不再固定顯示持平）。當完全沒有完整週時，維持既有的無資料處理（有當週容積則顯示「首週訓練中」）。
 
-當週的即時容積（週一到當日的部分加總）SHALL 不作為趨勢比較的基準值，僅作為卡片顯示用（見「Display Volume and Trend on Homepage」）。
+由於當週為進行中的部分加總，週初可能因累積尚少而顯示為 "DOWN"；此為已知並接受的取捨。
 
 #### Scenario: Trend is UP
-- **WHEN** 上一完整週容積為 5000，前期各週平均為 4000
+- **WHEN** 當週即時總量為 5000，過往完整週平均為 4000
 - **THEN** 趨勢分類 SHALL 為 "UP"
 
 #### Scenario: Trend is DOWN
-- **WHEN** 上一完整週容積為 3000，前期各週平均為 4000
+- **WHEN** 當週即時總量為 4200，過往完整週平均為 10000
 - **THEN** 趨勢分類 SHALL 為 "DOWN"
 
 #### Scenario: Trend is STABLE
-- **WHEN** 上一完整週容積為 4100，前期各週平均為 4000
+- **WHEN** 當週即時總量為 10200，過往完整週平均為 10000（在 ±5% 內）
 - **THEN** 趨勢分類 SHALL 為 "STABLE"
 
-#### Scenario: 部分當週不影響趨勢
-- **WHEN** 當週（進行中）到當日僅累積少量容積，但上一完整週容積高於前期各週平均 105%
-- **THEN** 趨勢 SHALL 判定為 "UP"（不因當週部分加總偏低而變成 "DOWN"）
+#### Scenario: 只有一個完整週也直接比較
+- **WHEN** 除了當週之外僅存在一個完整週，且當週總量高於該完整週 105%
+- **THEN** 趨勢 SHALL 判定為 "UP"（不再固定為持平）
 
-#### Scenario: 僅有一個完整週時持平
-- **WHEN** 除了當週之外，僅存在一個有紀錄的完整週（無前期各週可平均）
-- **THEN** 趨勢 SHALL 顯示為 "STABLE"（持平）
+#### Scenario: 沒有任何完整週
+- **WHEN** 僅有當週且尚無完整週、當週已有容積
+- **THEN** 系統 SHALL 顯示「首週訓練中」
 
 ### Requirement: Display Volume and Trend on Homepage
 首頁的容積卡片標頭 SHALL 以左右兩欄呈現兩項當週摘要：左欄為「當週訓練總容積」（週一到當日的即時加總），右欄為「當週平均體重」。每一欄 SHALL 各自顯示其大數字與一個趨勢指示 chip。
 
-容積趨勢 chip SHALL 依「Calculate Historical Average and Trend」的分類（UP/DOWN/STABLE）呈現對應圖示與好壞語意色（上升為正向色）。由於趨勢基準為「上一完整週 vs 前期各週平均」而非畫面上的當週即時數字，卡片 SHALL 顯示一行共用的基準說明文字（例如「趨勢基準：上一完整週 vs 前期各週平均」）。
+容積趨勢 chip SHALL 依「Calculate Historical Average and Trend」的分類（UP/DOWN/STABLE）呈現對應圖示與好壞語意色（上升為正向色）。趨勢基準為「當週總量 vs 過往完整週平均」，被比較的值即為畫面上的當週即時數字；卡片 SHALL 顯示一行共用的基準說明文字（例如「趨勢基準：當週總量 vs 過往完整週平均」）。
 
 #### Scenario: Dashboard rendering
 - **WHEN** 使用者開啟首頁
 - **THEN** 容積卡片標頭 SHALL 顯示左欄「當週訓練總容積」與右欄「當週平均體重」，兩者各附趨勢 chip，並顯示一行共用的趨勢基準說明
 
-#### Scenario: 徽章反映上一完整週
-- **WHEN** 當週即時容積偏低但上一完整週高於前期平均
-- **THEN** 容積趨勢 chip SHALL 顯示為上升，且卡片 SHALL 以基準說明文字標明比較對象為上一完整週
+#### Scenario: 趨勢反映當週總量
+- **WHEN** 當週即時總量高於過往完整週平均 105%
+- **THEN** 容積趨勢 chip SHALL 顯示為上升，且卡片 SHALL 以基準說明文字標明比較對象為過往完整週平均
 
 ### Requirement: Provide Trailing 12-Week Volume Series
 系統 SHALL 提供最近 12 個日曆週（含當週，往回共 12 週）的訓練容積序列，供首頁圖表使用。每一週的容積為該週內所有訓練紀錄的 `reps * weight` 加總；**沒有任何紀錄的週 SHALL 以 0 表示且不得省略**，使序列固定為 12 筆、依時間由舊到新排序。系統 SHALL 一併提供此 12 週的平均容積。
@@ -146,14 +145,14 @@ This capability calculates and tracks the weekly training volume and provides co
 - **THEN** 圖表 SHALL 不繪製體重折線，並顯示引導訊息（提示記錄體重即可對照），而非留白或異常
 
 ### Requirement: Calculate Current Week Average Body Weight and Trend
-系統 SHALL 提供「當週平均體重」＝當週（週一到週日）內所有體重紀錄 `bodyWeight` 的算術平均，供首頁右欄顯示；當週無體重紀錄時 SHALL 以無資料狀態呈現。系統 SHALL 以與容積相同的「上一完整週 vs 前期各週平均」（2A）方式，判定體重的變化方向與變化量（kg）。體重趨勢 SHALL 以中性語意呈現（不使用好壞色，升與降皆不代表好或壞），且僅有一個完整週時 SHALL 顯示為持平。
+系統 SHALL 提供「當週平均體重」＝當週（週一到週日）內所有體重紀錄 `bodyWeight` 的算術平均，供首頁右欄顯示；當週無體重紀錄時 SHALL 以無資料狀態呈現。系統 SHALL 以與容積相同的「當週 vs 過往完整週平均」方式，判定體重的變化方向與變化量（kg）：以當週平均體重對「所有完整週平均體重」相比，門檻採 ±0.3kg。體重趨勢 SHALL 以中性語意呈現（不使用好壞色，升與降皆不代表好或壞）。當週無體重紀錄、或無任何過往完整週時 SHALL 顯示為無趨勢。
 
 #### Scenario: 當週平均體重為當週體重紀錄平均
 - **WHEN** 當週內有體重紀錄 77.8 與 78.2
 - **THEN** 當週平均體重 SHALL 為 78.0
 
 #### Scenario: 體重趨勢採中性語意
-- **WHEN** 上一完整週平均體重高於前期各週平均
+- **WHEN** 當週平均體重高於過往完整週平均體重超過 0.3kg
 - **THEN** 體重趨勢 chip SHALL 以中性樣式顯示上升方向與變化量（kg），且 SHALL 不套用好壞色
 
 #### Scenario: 當週無體重紀錄

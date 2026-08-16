@@ -65,8 +65,9 @@ export const useSessionStore = defineStore('session', {
 
             const currentVolume = weeklyVolumes[currentMonday] || 0;
 
-            // 方案 2A：以「上一完整週」對「前期各週平均」判定趨勢，
-            // 而非拿當週的部分加總去比。完整週＝有紀錄且非當週的各週。
+            // 趨勢：以「當週即時總量」對「過往完整週平均」判定。
+            // 完整週＝有紀錄且非當週的各週。當週即時總量（部分加總）就是被比較的值，
+            // 與標頭大數字一致——週初偏低時可能顯示下降（已知並接受的取捨）。
             const completeWeeks = Object.keys(weeklyVolumes)
                 .filter(monday => monday !== currentMonday)
                 .sort(); // YYYY-MM-DD 補零，字典序即時間序
@@ -80,24 +81,15 @@ export const useSessionStore = defineStore('session', {
                 // 完全沒有完整週，維持既有無資料處理
                 trend = currentVolume > 0 ? 'up' : 'none';
                 statusLabel = currentVolume > 0 ? '首週訓練中' : '—';
-            } else if (completeWeeks.length === 1) {
-                // 只有一個完整週：無前期可構成平均 → 持平
-                averageVolume = weeklyVolumes[completeWeeks[0]];
-                trend = 'stable';
-                statusLabel = '持平';
-                trendPct = 0;
             } else {
-                const lastComplete = completeWeeks[completeWeeks.length - 1];
-                const priorWeeks = completeWeeks.slice(0, -1);
-                const lastVolume = weeklyVolumes[lastComplete];
                 averageVolume = Math.round(
-                    priorWeeks.reduce((sum, monday) => sum + weeklyVolumes[monday], 0) / priorWeeks.length
+                    completeWeeks.reduce((sum, monday) => sum + weeklyVolumes[monday], 0) / completeWeeks.length
                 );
-                trendPct = averageVolume > 0 ? Math.round((lastVolume / averageVolume - 1) * 100) : null;
-                if (lastVolume > averageVolume * 1.05) {
+                trendPct = averageVolume > 0 ? Math.round((currentVolume / averageVolume - 1) * 100) : null;
+                if (currentVolume > averageVolume * 1.05) {
                     trend = 'up';
                     statusLabel = '上升';
-                } else if (lastVolume < averageVolume * 0.95) {
+                } else if (currentVolume < averageVolume * 0.95) {
                     trend = 'down';
                     statusLabel = '下降';
                 } else {
@@ -106,7 +98,7 @@ export const useSessionStore = defineStore('session', {
                 }
             }
 
-            // 每週平均體重：當週摘要與趨勢（同採 2A，門檻改用絕對量 ±0.3kg）
+            // 每週平均體重：當週摘要與趨勢（同邏輯——當週 vs 過往完整週平均，門檻 ±0.3kg）
             const BW_THRESHOLD = 0.3;
             const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
             const currentBodyWeight = weeklyBW[currentMonday] !== undefined ? weeklyBW[currentMonday] : null;
@@ -117,15 +109,9 @@ export const useSessionStore = defineStore('session', {
 
             let bodyWeightTrend = 'none';
             let bodyWeightDelta = null;
-            if (completeBWWeeks.length === 1) {
-                bodyWeightTrend = 'stable';
-                bodyWeightDelta = 0;
-            } else if (completeBWWeeks.length > 1) {
-                const lastBWKey = completeBWWeeks[completeBWWeeks.length - 1];
-                const priorBWWeeks = completeBWWeeks.slice(0, -1);
-                const lastBW = weeklyBW[lastBWKey];
-                const avgBW = priorBWWeeks.reduce((sum, monday) => sum + weeklyBW[monday], 0) / priorBWWeeks.length;
-                bodyWeightDelta = lastBW - avgBW;
+            if (currentBodyWeight !== null && completeBWWeeks.length > 0) {
+                const avgBW = completeBWWeeks.reduce((sum, monday) => sum + weeklyBW[monday], 0) / completeBWWeeks.length;
+                bodyWeightDelta = currentBodyWeight - avgBW;
                 if (bodyWeightDelta > BW_THRESHOLD) bodyWeightTrend = 'up';
                 else if (bodyWeightDelta < -BW_THRESHOLD) bodyWeightTrend = 'down';
                 else bodyWeightTrend = 'stable';
