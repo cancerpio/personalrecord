@@ -81,19 +81,19 @@ This capability calculates and tracks the weekly training volume and provides co
 - **WHEN** 當週即時容積偏低但上一完整週高於前期平均
 - **THEN** 容積趨勢 chip SHALL 顯示為上升，且卡片 SHALL 以基準說明文字標明比較對象為上一完整週
 
-### Requirement: Provide Trailing 16-Week Volume Series
-系統 SHALL 提供最近 16 個日曆週（含當週，往回共 16 週）的訓練容積序列，供首頁圖表使用。每一週的容積為該週內所有訓練紀錄的 `reps * weight` 加總；**沒有任何紀錄的週 SHALL 以 0 表示且不得省略**，使序列固定為 16 筆、依時間由舊到新排序。系統 SHALL 一併提供此 16 週的平均容積。
+### Requirement: Provide Trailing 12-Week Volume Series
+系統 SHALL 提供最近 12 個日曆週（含當週，往回共 12 週）的訓練容積序列，供首頁圖表使用。每一週的容積為該週內所有訓練紀錄的 `reps * weight` 加總；**沒有任何紀錄的週 SHALL 以 0 表示且不得省略**，使序列固定為 12 筆、依時間由舊到新排序。系統 SHALL 一併提供此 12 週的平均容積。
 
-#### Scenario: 序列固定 16 筆並補零
-- **WHEN** 過去 16 週中僅有 3 個週有訓練紀錄
-- **THEN** 回傳的序列仍 SHALL 為 16 筆，其中 13 筆容積為 0，且順序由最舊週到當週
+#### Scenario: 序列固定 12 筆並補零
+- **WHEN** 過去 12 週中僅有 3 個週有訓練紀錄
+- **THEN** 回傳的序列仍 SHALL 為 12 筆，其中 9 筆容積為 0，且順序由最舊週到當週
 
-#### Scenario: 平均值涵蓋全部 16 週
-- **WHEN** 16 週容積序列為已知值
-- **THEN** 系統 SHALL 回傳「16 週平均 = 序列總和 / 16」（含補 0 的週一併計入）
+#### Scenario: 平均值涵蓋全部 12 週
+- **WHEN** 12 週容積序列為已知值
+- **THEN** 系統 SHALL 回傳「12 週平均 = 序列總和 / 12」（含補 0 的週一併計入）
 
-### Requirement: Display 16-Week Volume Bar Chart
-首頁的容積卡片 SHALL 在標頭之下，以長條圖顯示過去 16 週的容積序列：每一週一根長條、其餘週以次要樣式呈現。**當週該根為「週一到當日」的部分累積值，SHALL 以「進行中」樣式（如 ghost／虛線外框）並輔以進行中標示呈現，明確表達其為未完成的部分加總，避免被誤讀為容積驟降。** 卡片 SHALL 顯示一條代表 16 週平均的參考線，並顯示 16 週平均的數值。使用者對某一週長條進行 hover 或點擊時，系統 SHALL 顯示該週明細。
+### Requirement: Display 12-Week Volume Bar Chart
+首頁的容積卡片 SHALL 在標頭之下，以長條圖顯示過去 12 週的容積序列：每一週一根長條、其餘週以次要樣式呈現。**當週該根為「週一到當日」的部分累積值，SHALL 以「進行中」樣式（如 ghost／虛線外框）並輔以進行中標示呈現，明確表達其為未完成的部分加總，避免被誤讀為容積驟降。** 卡片 SHALL 顯示一條代表 12 週平均的參考線，並顯示 12 週平均的數值。使用者對某一週長條進行 hover 或點擊時，系統 SHALL 顯示該週明細。
 
 #### Scenario: 當週柱以進行中樣式呈現
 - **WHEN** 使用者開啟首頁，且當週僅累積到當日的部分容積
@@ -107,8 +107,8 @@ This capability calculates and tracks the weekly training volume and provides co
 - **WHEN** 使用者 hover 或點擊某一週的長條
 - **THEN** 系統 SHALL 顯示該週的日期範圍與容積數值
 
-### Requirement: Provide Trailing 16-Week Average Body Weight
-系統 SHALL 在最近 16 週的序列中，為每一週提供該週的平均體重 `avgBodyWeight`。每一週的平均體重 SHALL 為該週（週一到週日，沿用既有 UTC 週邊界）內所有體重紀錄 `bodyWeight` 的算術平均；**該週若無任何體重紀錄，`avgBodyWeight` SHALL 為 `null`**（不得補 0，不得內插）。此欄位 SHALL 以新增方式提供，不影響既有 16 週容積序列欄位。
+### Requirement: Provide Trailing 12-Week Average Body Weight
+系統 SHALL 在最近 12 週的序列中，為每一週提供該週的平均體重 `avgBodyWeight`。每一週的平均體重 SHALL 為該週（週一到週日，沿用既有 UTC 週邊界）內所有體重紀錄 `bodyWeight` 的算術平均；**該週若無任何體重紀錄，`avgBodyWeight` SHALL 為 `null`**（不得補 0，不得內插）。此欄位 SHALL 以新增方式提供，不影響既有 12 週容積序列欄位。
 
 #### Scenario: 週平均為該週體重紀錄之平均
 - **WHEN** 某一週內有體重紀錄 76.0 與 78.0
@@ -119,14 +119,14 @@ This capability calculates and tracks the weekly training volume and provides co
 - **THEN** 該週 `avgBodyWeight` SHALL 為 `null`（而非 0）
 
 ### Requirement: Display Weekly Average Body Weight Line Overlay
-首頁 16 週容積圖 SHALL 在既有的容積長條之上，疊加一條「每週平均體重」折線，形成雙軸圖：容積長條使用左軸（由 0 起算），體重折線使用右軸（依資料自動決定範圍，不從 0 起算）。`avgBodyWeight` 為 `null` 的週，折線 SHALL 於該處斷開、不繪製資料點與連線（不補 0、不內插）。圖表 SHALL 提供圖例以區分容積與體重兩個數列。使用者 hover 某一週時，明細 SHALL 一併顯示該週的容積與平均體重（該週無體重紀錄時 SHALL 顯示為無紀錄）。
+首頁 12 週容積圖 SHALL 在既有的容積長條之上，疊加一條「每週平均體重」折線，形成雙軸圖：容積長條使用左軸（由 0 起算），體重折線使用右軸（依資料自動決定範圍，不從 0 起算）。`avgBodyWeight` 為 `null` 的週，折線 SHALL 於該處斷開、不繪製資料點與連線（不補 0、不內插）。圖表 SHALL 提供圖例以區分容積與體重兩個數列。使用者 hover 某一週時，明細 SHALL 一併顯示該週的容積與平均體重（該週無體重紀錄時 SHALL 顯示為無紀錄）。
 
 #### Scenario: 疊加體重折線與雙軸
 - **WHEN** 使用者開啟首頁
-- **THEN** 16 週圖 SHALL 同時顯示容積長條（左軸）與每週平均體重折線（右軸），並提供可區分兩數列的圖例
+- **THEN** 12 週圖 SHALL 同時顯示容積長條（左軸）與每週平均體重折線（右軸），並提供可區分兩數列的圖例
 
 #### Scenario: 缺值週折線斷開
-- **WHEN** 16 週中某一週 `avgBodyWeight` 為 `null`
+- **WHEN** 12 週中某一週 `avgBodyWeight` 為 `null`
 - **THEN** 體重折線 SHALL 在該週斷開（不畫點、不連線），而非以 0 呈現
 
 #### Scenario: 互動同時顯示容積與體重
@@ -138,11 +138,11 @@ This capability calculates and tracks the weekly training volume and provides co
 - **THEN** 系統 SHALL 顯示該週明細（不得僅依賴 hover）
 
 #### Scenario: 右軸範圍受最小與最大跨度夾制
-- **WHEN** 16 週非 `null` 的體重資料實際跨度小於 8kg
+- **WHEN** 12 週非 `null` 的體重資料實際跨度小於 8kg
 - **THEN** 體重右軸 SHALL 至少呈現約 8kg 的跨度（使 ±0.3kg 等級的波動不被放大成明顯趨勢），且右軸設定 SHALL NOT 影響左軸容積的尺度
 
 #### Scenario: 全無體重資料時的空狀態
-- **WHEN** 過去 16 週皆無任何體重紀錄
+- **WHEN** 過去 12 週皆無任何體重紀錄
 - **THEN** 圖表 SHALL 不繪製體重折線，並顯示引導訊息（提示記錄體重即可對照），而非留白或異常
 
 ### Requirement: Calculate Current Week Average Body Weight and Trend
