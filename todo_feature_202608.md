@@ -15,6 +15,7 @@
 | 7 | AI chatbot 檢視 / 優化課表 | 高 | ★★ | 之後 | [ ] |
 | 8 | 紀錄前一天吃啥 | 低中 | ★★★ | 之後 | [ ] |
 | 9 | 跟好友比賽訓練量和身體組成 | 中 | ★ | 最後 | [ ] |
+| 10 | 前端元件測試基礎設施 | 中 | ★★★★ | 地基 | [ ] |
 
 ---
 
@@ -91,6 +92,28 @@
 
 ---
 
+## 10. 前端元件測試基礎設施
+
+**緣起**：`record-form-prefill` 完成時，spec 中 12 個 Scenario 有 3 個沒有自動化測試覆蓋，因為它們是 `RecordView.vue` 裡 watch 的「接線行為」，store 層的單元測試碰不到：
+
+| 未覆蓋的行為 | 目前靠什麼成立 |
+|---|---|
+| 初次載入不清空欄位 | watch 沒加 `{ immediate: true }` |
+| 改日期不觸發帶入 | watch 監聽 `() => form.exercise` 而非整個 `form` |
+| 送出後欄位保留 | `submitLog()` 沒有 reset 表單 |
+
+三者都屬於「改一行就悄悄破掉、且不會報錯」的類型。例如有人在 `submitLog` 加了表單 reset，連續記多組的流程就沒了，但測試仍然全綠。
+
+**要做的事**
+- `vitest.config.js` 的 `environment` 由 `'node'` 改為 `'jsdom'`。
+- 新增 devDependency：`@vue/test-utils`、`jsdom`（目前皆未安裝）。
+- 處理 `RecordView.vue` 的測試 stub：`useRouter()`、`SearchableDropdown` 子元件、pinia store。
+- 補上上表 3 個行為的測試。
+
+**排序理由**：這 3 條行為本身不足以撐起一整套測試基礎設施，但「repo 從此能測 UI 行為」本身有價值，且愈早架成本愈低（目前只有 5 個 view/component 要照顧）。與 #4 同屬品質基礎設施，故並列於地基梯隊。刻意不併入 `record-form-prefill` 該次變更——那會讓一個小功能挾帶整個 repo 的測試策略決定。
+
+---
+
 ## 5. MCP
 
 排在 chatbot 前面：兩者目的重疊（用 AI 看課表），但 MCP 是把資料暴露給已在付費的 Claude，不用自己接 LLM API、不用管 key 與成本；chatbot 要後端 proxy、prompt 設計、還要付 token 費。同樣價值，MCP 便宜一個數量級。做完 #3 後大概就是包一層。
@@ -127,7 +150,7 @@
 
 1. **#1** 記住上次組次數（半天，立刻有感）
 2. **#2** 動作變化通知（主菜；先走 brainstorming 把三個規則問題定案再寫，週邊界建議沿用現況）
-3. **#4** backend CI（順手，之後都受益）
+3. **#4** backend CI + **#10** 元件測試基礎設施（順手，之後都受益）
 4. **#3** 資料匯出
 5. **#5** MCP
 
