@@ -31,6 +31,15 @@ function getWeeklyBodyWeightAverages(bodyMetrics) {
     return avgs;
 }
 
+// 將 createdAt 正規化為可比較的毫秒數。
+// local 模式存的是 Date.now() 數字、後端存的是 ISO 字串，兩者都吃得下；
+// 舊資料可能完全沒有此欄位，回 null 交由呼叫端退回陣列順序。
+function toTimestamp(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const t = new Date(value).getTime();
+    return Number.isNaN(t) ? null : t;
+}
+
 export const useSessionStore = defineStore('session', {
     state: () => ({
         sessions: [],
@@ -43,6 +52,42 @@ export const useSessionStore = defineStore('session', {
         // Basic getter
         getSessionsByExercise: (state) => (exerciseName) => {
             return state.sessions.filter(s => s.exercise === exerciseName).sort((a, b) => new Date(a.date) - new Date(b.date));
+        },
+
+        // 取得某動作「最後一組」的重量與次數，供記錄表單選完動作後帶入。
+        // 「最後一組」＝先比 date（YYYY-MM-DD 補零，字典序即時間序），
+        // 同日再比 createdAt；任一方缺 createdAt 時退回陣列原順序（後加入者視為較新）。
+        // 動作名稱採精確比對，不做 trim／大小寫正規化。
+        getLastSetForExercise: (state) => (exerciseName) => {
+            if (!exerciseName) return null;
+
+            let best = null;
+            let bestIdx = -1;
+            let bestTs = null;
+
+            state.sessions.forEach((session, idx) => {
+                if (!session || session.exercise !== exerciseName || !session.date) return;
+
+                const ts = toTimestamp(session.createdAt);
+
+                if (best === null) {
+                    best = session; bestIdx = idx; bestTs = ts;
+                    return;
+                }
+
+                let isNewer;
+                if (session.date !== best.date) {
+                    isNewer = session.date > best.date;
+                } else if (ts !== null && bestTs !== null) {
+                    isNewer = ts > bestTs;
+                } else {
+                    isNewer = idx > bestIdx;
+                }
+
+                if (isNewer) { best = session; bestIdx = idx; bestTs = ts; }
+            });
+
+            return best ? { weight: best.weight, reps: best.reps } : null;
         },
 
         // Weekly training volume calculation and trend
