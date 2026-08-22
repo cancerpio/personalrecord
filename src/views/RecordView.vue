@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed, onMounted } from 'vue';
+import { reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import SearchableDropdown from '../components/SearchableDropdown.vue';
 import { BASE_EXERCISES } from '../constants.js';
@@ -33,8 +33,6 @@ const currentFatRecord = computed(() => {
   return sessionStore.bodyMetrics.find(item => item.date === fatForm.date);
 });
 
-import { watch } from 'vue';
-
 watch(currentFatRecord, (newRecord) => {
   if (newRecord) {
     fatForm.fatPercentage = newRecord.fatPercentage !== undefined ? newRecord.fatPercentage : '';
@@ -44,6 +42,16 @@ watch(currentFatRecord, (newRecord) => {
     fatForm.bodyWeight = '';
   }
 }, { immediate: true });
+
+// 選完動作後帶入該動作「上次的最後一組」，讓使用者只需微調或直接送出。
+// 僅在動作改變時觸發：改日期或送出後都不會蓋掉欄位，
+// 維持「存檔後欄位保留、可連續送出多組」的既有行為。
+// 該動作沒有任何紀錄時清空欄位，使欄位永遠反映目前所選動作。
+watch(() => form.exercise, (exerciseName) => {
+  const lastSet = exerciseName ? sessionStore.getLastSetForExercise(exerciseName) : null;
+  form.weight = lastSet ? lastSet.weight : '';
+  form.reps = lastSet ? lastSet.reps : '';
+});
 
 const savedSessions = computed(() => sessionStore.sessions);
 

@@ -172,3 +172,92 @@ describe('trailing12WeekVolumeInfo — 每週平均體重', () => {
     expect(wk.avgBodyWeight).toBeCloseTo(78.0, 5); // (77.8 + 78.2) / 2
   });
 });
+
+describe('getLastSetForExercise — 帶出該動作的最後一組', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('跨日時取最新日期的紀錄', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-19', exercise: 'Squat', weight: 100, reps: 5, createdAt: 1 },
+      { id: '2', date: '2026-08-22', exercise: 'Squat', weight: 110, reps: 3, createdAt: 2 },
+      { id: '3', date: '2026-08-20', exercise: 'Squat', weight: 105, reps: 5, createdAt: 3 },
+    ];
+    expect(store.getLastSetForExercise('Squat')).toEqual({ weight: 110, reps: 3 });
+  });
+
+  it('同一天多組時取 createdAt 最後的那一組（而非最重的）', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 5, createdAt: 10 },
+      { id: '2', date: '2026-08-22', exercise: 'Squat', weight: 120, reps: 1, createdAt: 20 },
+      { id: '3', date: '2026-08-22', exercise: 'Squat', weight: 90, reps: 8, createdAt: 30 },
+    ];
+    expect(store.getLastSetForExercise('Squat')).toEqual({ weight: 90, reps: 8 });
+  });
+
+  it('只看指定動作，不受其他動作影響', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-19', exercise: 'Squat', weight: 100, reps: 5, createdAt: 1 },
+      { id: '2', date: '2026-08-22', exercise: 'Bench Press', weight: 80, reps: 8, createdAt: 2 },
+    ];
+    expect(store.getLastSetForExercise('Squat')).toEqual({ weight: 100, reps: 5 });
+    expect(store.getLastSetForExercise('Bench Press')).toEqual({ weight: 80, reps: 8 });
+  });
+
+  it('該動作沒有任何紀錄時回傳 null', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-19', exercise: 'Squat', weight: 100, reps: 5, createdAt: 1 },
+    ];
+    expect(store.getLastSetForExercise('Lunge')).toBeNull();
+  });
+
+  it('sessions 為空時回傳 null', () => {
+    const store = useSessionStore();
+    store.sessions = [];
+    expect(store.getLastSetForExercise('Squat')).toBeNull();
+  });
+
+  it('動作名稱為空字串時回傳 null', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-19', exercise: 'Squat', weight: 100, reps: 5, createdAt: 1 },
+    ];
+    expect(store.getLastSetForExercise('')).toBeNull();
+  });
+
+  it('createdAt 為 ISO 字串（後端模式）時同樣正確排序', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 5, createdAt: '2026-08-22T10:00:00.000Z' },
+      { id: '2', date: '2026-08-22', exercise: 'Squat', weight: 115, reps: 2, createdAt: '2026-08-22T11:30:00.000Z' },
+      { id: '3', date: '2026-08-22', exercise: 'Squat', weight: 95, reps: 6, createdAt: '2026-08-22T09:15:00.000Z' },
+    ];
+    expect(store.getLastSetForExercise('Squat')).toEqual({ weight: 115, reps: 2 });
+  });
+
+  it('缺 createdAt 的舊資料以陣列順序為準（後加入者視為較新）', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 5 },
+      { id: '2', date: '2026-08-22', exercise: 'Squat', weight: 105, reps: 4 },
+    ];
+    expect(store.getLastSetForExercise('Squat')).toEqual({ weight: 105, reps: 4 });
+  });
+
+  it('同一天中部分有 createdAt、部分沒有時不會拋錯，仍回傳一組結果', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 5 },
+      { id: '2', date: '2026-08-22', exercise: 'Squat', weight: 105, reps: 4, createdAt: 500 },
+    ];
+    const result = store.getLastSetForExercise('Squat');
+    expect(result).not.toBeNull();
+    expect(result).toHaveProperty('weight');
+    expect(result).toHaveProperty('reps');
+  });
+});
