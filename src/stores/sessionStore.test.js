@@ -22,7 +22,7 @@ function buildDataset() {
   return { sessions, body };
 }
 
-describe('weeklyTrainingVolumeInfo — 趨勢：當週總量 vs 過往完整週平均', () => {
+describe('weeklyTrainingVolumeInfo — 容積趨勢：當週總量 vs 12 週基準', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
@@ -32,60 +32,76 @@ describe('weeklyTrainingVolumeInfo — 趨勢：當週總量 vs 過往完整週�
 
   const sess = (date, weight) => ({ id: date + '-' + weight, date, exercise: 'Squat', reps: 1, weight });
 
-  it('當週總量高於過往完整週平均 → 上升，trendPct = 當週 vs 平均', () => {
+  it('基準為最近 12 個完整週，空白週補 0、分母固定 12', () => {
     const store = useSessionStore();
     store.sessions = [
-      sess('2026-06-22', 4000), // 完整週
-      sess('2026-06-29', 4000), // 完整週（平均 4000）
-      sess('2026-07-06', 5000), // 當週即時總量
+      sess('2026-06-29', 12000), // 視窗內唯一有紀錄的完整週
+      sess('2026-07-06', 1000),  // 當週
     ];
-    const info = store.weeklyTrainingVolumeInfo;
-    expect(info.currentVolume).toBe(5000);
-    expect(info.averageVolume).toBe(4000);
-    expect(info.trend).toBe('up');
-    expect(info.trendPct).toBe(25); // (5000/4000 - 1) * 100
+    expect(store.weeklyTrainingVolumeInfo.averageVolume).toBe(1000); // 12000 / 12
   });
 
-  it('當週為進行中的部分加總、低於平均 → 下降（知情接受的週初偏低）', () => {
+  it('當週容積不計入基準', () => {
     const store = useSessionStore();
     store.sessions = [
-      sess('2026-06-22', 10000),
-      sess('2026-06-29', 10000), // 平均 10000
-      sess('2026-07-06', 4200),  // 當週部分加總，遠低於平均
+      sess('2026-06-29', 12000),
+      sess('2026-07-06', 999999), // 當週再大也不該影響基準
+    ];
+    expect(store.weeklyTrainingVolumeInfo.averageVolume).toBe(1000);
+  });
+
+  it('超出 12 週視窗的紀錄不計入基準', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      sess('2026-04-06', 999999), // 當週往回第 13 週，已在視窗外
+      sess('2026-06-29', 12000),
+      sess('2026-07-06', 1000),
+    ];
+    expect(store.weeklyTrainingVolumeInfo.averageVolume).toBe(1000);
+  });
+
+  it('當週總量高於基準 5% 以上 → 上升', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      sess('2026-06-29', 12000), // 基準 1000
+      sess('2026-07-06', 2000),
+    ];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.currentVolume).toBe(2000);
+    expect(info.trend).toBe('up');
+    expect(info.trendPct).toBe(100);
+  });
+
+  it('當週為進行中的部分加總、低於基準 → 下降（知情接受的週初偏低）', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      sess('2026-06-29', 120000), // 基準 10000
+      sess('2026-07-06', 4200),
     ];
     const info = store.weeklyTrainingVolumeInfo;
     expect(info.trend).toBe('down');
-    expect(info.trendPct).toBe(-58); // (4200/10000 - 1) * 100
+    expect(info.trendPct).toBe(-58);
   });
 
-  it('當週落在平均 ±5% 內 → 持平', () => {
+  it('當週落在基準 ±5% 內 → 持平', () => {
     const store = useSessionStore();
     store.sessions = [
-      sess('2026-06-29', 10000), // 完整週
-      sess('2026-07-06', 10200), // 當週 +2%，在門檻內
+      sess('2026-06-29', 120000), // 基準 10000
+      sess('2026-07-06', 10200),  // +2%
     ];
     const info = store.weeklyTrainingVolumeInfo;
     expect(info.trend).toBe('stable');
     expect(info.statusLabel).toBe('持平');
   });
 
-  it('只有一個完整週也直接比較，不再固定持平', () => {
-    const store = useSessionStore();
-    store.sessions = [
-      sess('2026-06-29', 5000), // 唯一完整週
-      sess('2026-07-06', 8000), // 當週高於它 → 上升
-    ];
-    expect(store.weeklyTrainingVolumeInfo.trend).toBe('up');
-  });
-
-  it('沒有任何完整週 → 首週訓練中', () => {
+  it('視窗內完全沒有訓練紀錄 → 首週訓練中', () => {
     const store = useSessionStore();
     store.sessions = [sess('2026-07-06', 1000)];
     expect(store.weeklyTrainingVolumeInfo.statusLabel).toBe('首週訓練中');
   });
 });
 
-describe('weeklyTrainingVolumeInfo — 當週平均體重與體重趨勢（vs 過往完整週平均）', () => {
+describe('weeklyTrainingVolumeInfo — 當週平均體重與體重趨勢（vs 12 週基準）', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
@@ -95,38 +111,71 @@ describe('weeklyTrainingVolumeInfo — 當週平均體重與體重趨勢（vs �
 
   const bw = (date, bodyWeight) => ({ id: date + '-' + bodyWeight, date, bodyWeight });
 
-  it('當週平均體重高於過往完整週平均 >0.3kg → 上升（中性方向）', () => {
+  it('基準只平均「視窗內有體重紀錄的週」，空白週跳過而非補 0', () => {
     const store = useSessionStore();
     store.bodyMetrics = [
-      bw('2026-06-22', 76.0),
-      bw('2026-06-29', 76.0), // 過往完整週平均 76.0
-      bw('2026-07-06', 77.0), // 當週 +1.0
+      bw('2026-06-29', 76.0), // 視窗 12 週內唯一有紀錄的完整週
+      bw('2026-07-06', 77.0), // 當週
     ];
     const info = store.weeklyTrainingVolumeInfo;
     expect(info.currentBodyWeight).toBeCloseTo(77.0, 5);
+    expect(info.bodyWeightDelta).toBeCloseTo(1.0, 5); // 基準 76.0，而非 76.0/12
     expect(info.bodyWeightTrend).toBe('up');
-    expect(info.bodyWeightDelta).toBeCloseTo(1.0, 5);
   });
 
-  it('當週平均體重與過往平均差在 ±0.3kg 內 → 持平', () => {
+  it('超出 12 週視窗的體重不計入基準', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      bw('2026-04-06', 100.0), // 視窗外
+      bw('2026-06-29', 76.0),
+      bw('2026-07-06', 77.0),
+    ];
+    expect(store.weeklyTrainingVolumeInfo.bodyWeightDelta).toBeCloseTo(1.0, 5);
+  });
+
+  it('當週有多筆體重 → 取當週平均後再與基準比較', () => {
     const store = useSessionStore();
     store.bodyMetrics = [
       bw('2026-06-29', 76.0),
-      bw('2026-07-06', 76.1), // 差 0.1kg，在門檻內
-    ];
-    expect(store.weeklyTrainingVolumeInfo.bodyWeightTrend).toBe('stable');
-  });
-
-  it('當週有多筆體重 → 取當週平均後再與過往平均比較', () => {
-    const store = useSessionStore();
-    store.bodyMetrics = [
-      bw('2026-06-29', 76.0), // 過往
-      bw('2026-07-06', 77.8), // 當週兩筆
-      bw('2026-07-08', 78.2), // → 當週平均 78.0
+      bw('2026-07-06', 77.8),
+      bw('2026-07-08', 78.2), // 當週平均 78.0
     ];
     const info = store.weeklyTrainingVolumeInfo;
     expect(info.currentBodyWeight).toBeCloseTo(78.0, 5);
     expect(info.bodyWeightTrend).toBe('up');
+  });
+
+  it('差距四捨五入後恰為 0.5 → 持平（門檻含端點）', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [bw('2026-06-29', 76.0), bw('2026-07-06', 76.54)];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.bodyWeightDelta).toBe(0.5);
+    expect(info.bodyWeightTrend).toBe('stable');
+  });
+
+  it('差距四捨五入後為 0.6 → 上升', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [bw('2026-06-29', 76.0), bw('2026-07-06', 76.6)];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.bodyWeightDelta).toBe(0.6);
+    expect(info.bodyWeightTrend).toBe('up');
+  });
+
+  it('差距四捨五入後為 -0.6 → 下降', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [bw('2026-06-29', 76.0), bw('2026-07-06', 75.4)];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.bodyWeightDelta).toBe(-0.6);
+    expect(info.bodyWeightTrend).toBe('down');
+  });
+
+  it('bodyWeightDelta 已四捨五入到小數一位，且不得為 -0', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [bw('2026-06-29', 76.0), bw('2026-07-06', 75.96)]; // 差 -0.04
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(Object.is(info.bodyWeightDelta, -0)).toBe(false);
+    expect(info.bodyWeightDelta).toBe(0);
+    expect(info.bodyWeightTrend).toBe('stable');
   });
 
   it('無體重紀錄 → currentBodyWeight 為 null、趨勢 none', () => {
@@ -136,6 +185,15 @@ describe('weeklyTrainingVolumeInfo — 當週平均體重與體重趨勢（vs �
     const info = store.weeklyTrainingVolumeInfo;
     expect(info.currentBodyWeight).toBeNull();
     expect(info.bodyWeightTrend).toBe('none');
+  });
+
+  it('視窗內沒有任何完整週體重（只有當週有）→ 趨勢 none', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [bw('2026-07-06', 77.0)];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.currentBodyWeight).toBeCloseTo(77.0, 5);
+    expect(info.bodyWeightTrend).toBe('none');
+    expect(info.bodyWeightDelta).toBeNull();
   });
 });
 
@@ -159,6 +217,16 @@ describe('trailing12WeekVolumeInfo — 每週平均體重', () => {
     expect(t.weeks[11].isCurrent).toBe(true);
     expect(t.weeks[11].avgBodyWeight).toBeCloseTo(78.0, 5);
     expect(t.weeks[0].avgBodyWeight).toBeCloseTo(76.3, 5); // 新視窗最舊週＝原 index 4（bws[4]=76.3）
+  });
+
+  it('average 為 12 週基準（不含當週），與標頭 chip 的基準同值', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: 'a', date: '2026-06-29', exercise: 'Squat', reps: 1, weight: 12000 },
+      { id: 'b', date: '2026-07-06', exercise: 'Squat', reps: 1, weight: 999999 }, // 當週不計入
+    ];
+    expect(store.trailing12WeekVolumeInfo.average).toBe(1000);
+    expect(store.trailing12WeekVolumeInfo.average).toBe(store.weeklyTrainingVolumeInfo.averageVolume);
   });
 
   it('該週多筆體重取平均', () => {
@@ -259,5 +327,49 @@ describe('getLastSetForExercise — 帶出該動作的最後一組', () => {
     expect(result).not.toBeNull();
     expect(result).toHaveProperty('weight');
     expect(result).toHaveProperty('reps');
+  });
+});
+
+// 2026-08-23 回報的實際 bug：畫面顯示「-0.3 kg」，但當週體重其實比上一週高。
+// 以下為當時正式資料的體重快照（Firestore body_metrics），用來釘住修正後的結果。
+describe('體重趨勢 — 2026-08-23 實際資料回歸', () => {
+  const REAL_BODY_WEIGHTS = [
+    ['2026-05-26', 80.3], ['2026-05-30', 79.8], ['2026-05-31', 80.0],
+    ['2026-06-01', 79.8], ['2026-06-02', 80.3], ['2026-06-03', 80.3], ['2026-06-04', 80.3],
+    ['2026-06-05', 80.3], ['2026-06-06', 80.1], ['2026-06-07', 80.2],
+    ['2026-06-08', 81.2], ['2026-06-09', 81.2], ['2026-06-10', 81.3], ['2026-06-11', 81.3],
+    ['2026-06-12', 80.2], ['2026-06-13', 80.1], ['2026-06-14', 80.3],
+    ['2026-06-15', 81.2], ['2026-06-16', 80.4],
+    ['2026-07-01', 81.4], ['2026-07-03', 82.6], ['2026-07-05', 82.5],
+    ['2026-07-06', 82.5], ['2026-07-07', 82.2], ['2026-07-08', 82.3],
+    ['2026-07-16', 82.2], ['2026-07-17', 82.2], ['2026-07-18', 82.3],
+    ['2026-07-31', 80.4], ['2026-08-01', 80.1],
+    ['2026-08-03', 80.9], ['2026-08-04', 80.2],
+    ['2026-08-12', 81.6], ['2026-08-13', 80.9], ['2026-08-14', 80.6], ['2026-08-15', 80.6], ['2026-08-16', 81.7],
+    ['2026-08-17', 81.5], ['2026-08-18', 81.0], ['2026-08-19', 80.9],
+    ['2026-08-21', 81.6], ['2026-08-22', 80.8], ['2026-08-23', 81.1],
+  ];
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-23T12:00:00Z')); // 當週 = 2026-08-17 那週
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('當週高於上一完整週，趨勢差值 SHALL NOT 為負', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = REAL_BODY_WEIGHTS.map(([date, bodyWeight], i) => ({ id: 'b' + i, date, bodyWeight }));
+
+    const info = store.weeklyTrainingVolumeInfo;
+    const prevWeek = store.trailing12WeekVolumeInfo.weeks.find(w => w.monday === '2026-08-10');
+
+    expect(prevWeek.avgBodyWeight).toBeCloseTo(81.08, 2); // 8/10–8/16
+    expect(info.currentBodyWeight).toBeCloseTo(81.15, 2); // 8/17–8/23
+    expect(info.currentBodyWeight).toBeGreaterThan(prevWeek.avgBodyWeight);
+
+    // 12 週基準 81.043（視窗 5/25–8/10 內有紀錄的 10 週）→ 差 +0.107 → 顯示 +0.1
+    expect(info.bodyWeightDelta).toBe(0.1);
+    expect(info.bodyWeightTrend).toBe('stable');
   });
 });
