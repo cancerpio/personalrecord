@@ -4,6 +4,7 @@ import HistoryChart from '../components/HistoryChart.vue';
 import FilterControls from '../components/FilterControls.vue';
 import SparklineRow from '../components/SparklineRow.vue';
 import { useSessionStore } from '../stores/sessionStore.js';
+import { signed } from '../utils/format.js';
 
 const sessionStore = useSessionStore();
 
@@ -28,7 +29,9 @@ const headerBodyWeight = computed(() =>
 const bwTrendLabel = computed(() => {
   const info = volumeInfo.value;
   if (info.bodyWeightTrend === 'none' || info.bodyWeightDelta == null) return '—';
-  return `${Math.abs(info.bodyWeightDelta).toFixed(1)} kg`;
+  // 帶正負號。舊版用 Math.abs() 把方向吃掉，只靠 icon 表達，
+  // 而「持平」的水平線 icon 與負號難以區分，導致 +0.27 被讀成 -0.3。
+  return `${signed(info.bodyWeightDelta)} kg`;
 });
 
 // ---- 主題偵測（供 Highcharts 顏色使用；CSS 變數無法套用在 SVG fill 屬性上）----
@@ -131,7 +134,7 @@ const volumeChartOptions = computed(() => {
           width: 1.5,
           zIndex: 3,
           label: {
-            text: `平均 ${avg.toLocaleString()}`,
+            text: `12 週基準 ${avg.toLocaleString()}`,
             align: 'right',
             y: -4,
             style: { color: muted, fontSize: '10px', fontWeight: '600' }
@@ -370,12 +373,12 @@ onMounted(() => {
             <div class="chip neutral" :class="volumeInfo.bodyWeightTrend">
               <svg v-if="volumeInfo.bodyWeightTrend === 'up'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
               <svg v-else-if="volumeInfo.bodyWeightTrend === 'down'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <svg v-else viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="3.2"></circle></svg>
               <span>{{ bwTrendLabel }}</span>
             </div>
           </div>
         </div>
-        <div class="basis-note">趨勢基準：當週總量 vs 過往完整週平均</div>
+        <div class="basis-note">趨勢基準：本週 vs 過去 12 個完整週平均（不含本週）；體重未達 ±0.5 kg 視為持平</div>
       </div>
 
       <!-- 過去 12 週容積長條 + 每週平均體重折線（Highcharts combo） -->
@@ -385,7 +388,7 @@ onMounted(() => {
       </div>
 
       <div class="volume-footer">
-        <span class="history-average">過去 12 週平均：{{ volume12.average.toLocaleString() }} kg／週</span>
+        <span class="history-average">過去 12 個完整週平均：{{ volume12.average.toLocaleString() }} kg／週（不含本週）</span>
       </div>
     </div>
 

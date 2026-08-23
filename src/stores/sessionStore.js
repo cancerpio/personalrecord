@@ -31,6 +31,31 @@ function getWeeklyBodyWeightAverages(bodyMetrics) {
     return avgs;
 }
 
+// 12 週基準的視窗：自當週往回推的 N 個「完整週」週一（不含當週）。
+// 由舊到新回傳，供容積與體重共用同一組視窗，確保標頭 chip 與圖上基準線同值。
+const BASELINE_WEEKS = 12;
+function getBaselineWeekKeys(currentMonday, weeks = BASELINE_WEEKS) {
+    const [y, m, d] = currentMonday.split('-').map(Number);
+    const base = new Date(Date.UTC(y, m - 1, d));
+    const keys = [];
+    for (let i = weeks; i >= 1; i--) {
+        const dt = new Date(base);
+        dt.setUTCDate(dt.getUTCDate() - i * 7);
+        const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getUTCDate()).padStart(2, '0');
+        keys.push(`${dt.getUTCFullYear()}-${mm}-${dd}`);
+    }
+    return keys;
+}
+
+// 四捨五入到小數一位，並把 -0 正規化成 0。
+// 判定門檻與畫面顯示 SHALL 吃同一個值，避免「顯示 0.5 卻判定持平」這種自相矛盾，
+// 也避免 (-0.04).toFixed(1) 產生 "-0.0"。
+function round1(value) {
+    const r = Number(value.toFixed(1));
+    return r === 0 ? 0 : r;
+}
+
 // 將 createdAt 正規化為可比較的毫秒數。
 // local 模式存的是 Date.now() 數字、後端存的是 ISO 字串，兩者都吃得下；
 // 舊資料可能完全沒有此欄位，回 null 交由呼叫端退回陣列順序。
@@ -38,6 +63,40 @@ function toTimestamp(value) {
     if (value === undefined || value === null || value === '') return null;
     const t = new Date(value).getTime();
     return Number.isNaN(t) ? null : t;
+}
+
+// 找出時間序最後的一筆 session：先比 date（YYYY-MM-DD 補零，字典序即時間序），
+// 同日再比 createdAt；任一方缺 createdAt 時退回陣列原順序（後加入者視為較新）。
+// `matches` 為選填的篩選條件，省略時代表看全部紀錄。
+function findLatestSession(sessions, matches) {
+    let best = null;
+    let bestIdx = -1;
+    let bestTs = null;
+
+    (sessions || []).forEach((session, idx) => {
+        if (!session || !session.date) return;
+        if (matches && !matches(session)) return;
+
+        const ts = toTimestamp(session.createdAt);
+
+        if (best === null) {
+            best = session; bestIdx = idx; bestTs = ts;
+            return;
+        }
+
+        let isNewer;
+        if (session.date !== best.date) {
+            isNewer = session.date > best.date;
+        } else if (ts !== null && bestTs !== null) {
+            isNewer = ts > bestTs;
+        } else {
+            isNewer = idx > bestIdx;
+        }
+
+        if (isNewer) { best = session; bestIdx = idx; bestTs = ts; }
+    });
+
+    return best;
 }
 
 export const useSessionStore = defineStore('session', {
@@ -60,34 +119,15 @@ export const useSessionStore = defineStore('session', {
         // 動作名稱採精確比對，不做 trim／大小寫正規化。
         getLastSetForExercise: (state) => (exerciseName) => {
             if (!exerciseName) return null;
-
-            let best = null;
-            let bestIdx = -1;
-            let bestTs = null;
-
-            state.sessions.forEach((session, idx) => {
-                if (!session || session.exercise !== exerciseName || !session.date) return;
-
-                const ts = toTimestamp(session.createdAt);
-
-                if (best === null) {
-                    best = session; bestIdx = idx; bestTs = ts;
-                    return;
-                }
-
-                let isNewer;
-                if (session.date !== best.date) {
-                    isNewer = session.date > best.date;
-                } else if (ts !== null && bestTs !== null) {
-                    isNewer = ts > bestTs;
-                } else {
-                    isNewer = idx > bestIdx;
-                }
-
-                if (isNewer) { best = session; bestIdx = idx; bestTs = ts; }
-            });
-
+            const best = findLatestSession(state.sessions, s => s.exercise === exerciseName);
             return best ? { weight: best.weight, reps: best.reps } : null;
+        },
+
+        // 最近一筆訓練紀錄的動作名稱，供記錄表單初次載入時預選上次練的動作。
+        // 沿用與「最後一組」相同的時間序判定，兩者永遠指向同一筆紀錄。
+        getLastLoggedExercise: (state) => {
+            const best = findLatestSession(state.sessions);
+            return best ? (best.exercise || null) : null;
         },
 
         // Weekly training volume calculation and trend
@@ -110,25 +150,28 @@ export const useSessionStore = defineStore('session', {
 
             const currentVolume = weeklyVolumes[currentMonday] || 0;
 
-            // 趨勢：以「當週即時總量」對「過往完整週平均」判定。
-            // 完整週＝有紀錄且非當週的各週。當週即時總量（部分加總）就是被比較的值，
-            // 與標頭大數字一致——週初偏低時可能顯示下降（已知並接受的取捨）。
-            const completeWeeks = Object.keys(weeklyVolumes)
-                .filter(monday => monday !== currentMonday)
-                .sort(); // YYYY-MM-DD 補零，字典序即時間序
+            // 趨勢：以「當週即時總量」對「12 週基準」判定。
+            // 12 週基準＝往回推 12 個完整週（不含當週）的容積平均；該視窗內沒有訓練紀錄的週
+            // 補 0 計入、分母固定 12（沒訓練就是 0，這對容積是真值）。
+            // 當週即時總量（部分加總）就是被比較的值，與標頭大數字一致
+            // ——週初偏低時可能顯示下降（已知並接受的取捨）。
+            // 改用固定視窗而非「全期平均」的原因：全期平均是不斷成長的視窗，每多記一週就更遲鈍，
+            // 長期下來趨勢指示會退化成永遠「持平」且不會有任何錯誤徵兆。
+            const baselineWeeks = getBaselineWeekKeys(currentMonday);
+            const hasBaselineVolume = baselineWeeks.some(monday => weeklyVolumes[monday] !== undefined);
 
             let averageVolume = 0;
             let trend = 'none';
             let statusLabel = '—';
             let trendPct = null;
 
-            if (completeWeeks.length === 0) {
-                // 完全沒有完整週，維持既有無資料處理
+            if (!hasBaselineVolume) {
+                // 視窗內完全沒有訓練紀錄，維持既有無資料處理
                 trend = currentVolume > 0 ? 'up' : 'none';
                 statusLabel = currentVolume > 0 ? '首週訓練中' : '—';
             } else {
                 averageVolume = Math.round(
-                    completeWeeks.reduce((sum, monday) => sum + weeklyVolumes[monday], 0) / completeWeeks.length
+                    baselineWeeks.reduce((sum, monday) => sum + (weeklyVolumes[monday] || 0), 0) / BASELINE_WEEKS
                 );
                 trendPct = averageVolume > 0 ? Math.round((currentVolume / averageVolume - 1) * 100) : null;
                 if (currentVolume > averageVolume * 1.05) {
@@ -143,20 +186,23 @@ export const useSessionStore = defineStore('session', {
                 }
             }
 
-            // 每週平均體重：當週摘要與趨勢（同邏輯——當週 vs 過往完整週平均，門檻 ±0.3kg）
-            const BW_THRESHOLD = 0.3;
+            // 每週平均體重：當週摘要與趨勢，沿用與容積相同的 12 週視窗。
+            // 但空白週的處理刻意與容積不同——那週沒量體重不等於 0 kg，補 0 會把基準拉到 70 幾，
+            // 因此只平均「視窗內有體重紀錄的週」，分母是實際有紀錄的週數。
+            // 門檻 ±0.5kg：實測相鄰週的週平均體重變化中位數 0.27kg、平均 0.43kg，
+            // 舊的 ±0.3kg 會有近半數的正常波動踩過門檻，訊號被雜訊稀釋。
+            const BW_THRESHOLD = 0.5;
             const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
             const currentBodyWeight = weeklyBW[currentMonday] !== undefined ? weeklyBW[currentMonday] : null;
 
-            const completeBWWeeks = Object.keys(weeklyBW)
-                .filter(monday => monday !== currentMonday)
-                .sort();
+            const baselineBWWeeks = baselineWeeks.filter(monday => weeklyBW[monday] !== undefined);
 
             let bodyWeightTrend = 'none';
             let bodyWeightDelta = null;
-            if (currentBodyWeight !== null && completeBWWeeks.length > 0) {
-                const avgBW = completeBWWeeks.reduce((sum, monday) => sum + weeklyBW[monday], 0) / completeBWWeeks.length;
-                bodyWeightDelta = currentBodyWeight - avgBW;
+            if (currentBodyWeight !== null && baselineBWWeeks.length > 0) {
+                const avgBW = baselineBWWeeks.reduce((sum, monday) => sum + weeklyBW[monday], 0) / baselineBWWeeks.length;
+                // 先四捨五入再判定，讓門檻與畫面顯示永遠一致
+                bodyWeightDelta = round1(currentBodyWeight - avgBW);
                 if (bodyWeightDelta > BW_THRESHOLD) bodyWeightTrend = 'up';
                 else if (bodyWeightDelta < -BW_THRESHOLD) bodyWeightTrend = 'down';
                 else bodyWeightTrend = 'stable';
@@ -223,8 +269,12 @@ export const useSessionStore = defineStore('session', {
                 });
             }
 
-            const total = weeks.reduce((sum, w) => sum + w.volume, 0);
-            const average = Math.round(total / WEEKS);
+            // 基準線與標頭 chip 用同一個定義：往回 12 個完整週（不含當週）、空白週補 0、分母 12。
+            // 刻意不用「圖上這 12 根的平均」——那會把進行中的當週算進分母，
+            // 等於拿當週去跟一個包含自己的平均比較，週初必然被自己拉低。
+            const average = Math.round(
+                getBaselineWeekKeys(currentMonday).reduce((sum, monday) => sum + (weeklyVolumes[monday] || 0), 0) / BASELINE_WEEKS
+            );
 
             return { weeks, average };
         },
