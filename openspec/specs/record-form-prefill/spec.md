@@ -3,6 +3,8 @@
 ## Purpose
 This capability prefills the training log form with the last recorded set of the selected
 exercise, so the user only needs to adjust the numbers instead of retyping them for every set.
+It also preselects the most recently logged exercise on first load, so opening the form already
+shows the user's last set.
 
 ## Requirements
 
@@ -55,7 +57,9 @@ exercise, so the user only needs to adjust the numbers instead of retyping them 
 ### Requirement: Prefill Triggers Only On Exercise Change
 帶入行為 SHALL 僅在所選動作**改變**時觸發。變更日期、送出紀錄皆 SHALL NOT 觸發帶入，以維持既有的「送出後表單欄位保留、可連續送出同一動作的多組」行為。
 
-頁面初次載入時所選動作為空，系統 SHALL NOT 因此清空任何欄位。所選動作為空字串時，系統 SHALL 視為無可帶入的紀錄。
+所選動作為空字串時，系統 SHALL 視為無可帶入的紀錄，且 SHALL NOT 因該空值清空任何欄位（帶入行為不使用 `immediate`）。
+
+初次載入時所選動作 SHALL 由「Preselect Last Logged Exercise On First Load」決定；當該需求把動作填入表單時，本需求的「動作改變」條件成立，帶入行為 SHALL 隨之觸發——此為預期行為。
 
 #### Scenario: 送出後欄位保留
 - **WHEN** 使用者送出一筆 `Squat` 105×5 的紀錄
@@ -65,9 +69,42 @@ exercise, so the user only needs to adjust the numbers instead of retyping them 
 - **WHEN** 使用者在已填妥數值的狀態下變更表單日期
 - **THEN** 重量與次數欄位 SHALL 維持不變
 
-#### Scenario: 初次載入不清空欄位
-- **WHEN** 使用者開啟記錄頁，尚未選擇任何動作
+#### Scenario: 尚無任何訓練紀錄時不觸發帶入或清空
+- **WHEN** 使用者開啟記錄頁，且尚無任何訓練紀錄（無可預選的動作，所選動作維持為空）
 - **THEN** 系統 SHALL NOT 觸發帶入或清空行為
+
+#### Scenario: 預選動作會連帶觸發帶入
+- **WHEN** 初次載入時系統依「Preselect Last Logged Exercise On First Load」把動作填入表單
+- **THEN** 帶入行為 SHALL 被觸發，重量與次數 SHALL 為該動作最後一組的數值
+
+### Requirement: Preselect Last Logged Exercise On First Load
+記錄表單初次載入時，若使用者尚未選定動作且已存在訓練紀錄，系統 SHALL 將「最近一筆訓練紀錄的動作名稱」填入所選動作欄位。「最近一筆」SHALL 依「Determine The Last Set」完全相同的排序規則判定，使預選的動作與帶入的組數必定來自同一筆紀錄。
+
+`sessions` 為非同步載入，元件掛載當下可能仍為空陣列。系統 SHALL 等待資料到位後才套用預選，SHALL NOT 因掛載當下無資料即判定為無紀錄而放棄。
+
+預選 SHALL 只套用一次。送出紀錄會使「最近一筆紀錄」改變，此時系統 SHALL NOT 再次覆寫所選動作，以維持「送出後欄位保留、可連續送出同一動作多組」的既有行為。使用者已自行選定動作時，系統 SHALL NOT 覆寫其選擇。
+
+已知取捨：動作、重量、次數三者連同預設為今日的日期會使整張表單在開啟時即為可送出狀態，存在誤送的可能。此為刻意選擇——本應用為單人自用、誤記可刪除，額外要求一次確認點擊會抵銷本功能的價值。
+
+#### Scenario: 初次載入預選上次記錄的動作
+- **WHEN** 使用者開啟記錄頁，最近一筆訓練紀錄的動作為 `Bench Press`
+- **THEN** 所選動作 SHALL 為 `Bench Press`，且重量與次數 SHALL 為該動作最後一組的數值
+
+#### Scenario: 等待非同步資料載入後才預選
+- **WHEN** 元件掛載當下 `sessions` 為空，稍後才載入完成
+- **THEN** 系統 SHALL 於資料載入後才套用預選，SHALL NOT 因掛載當下無資料而永久放棄
+
+#### Scenario: 送出後不再覆寫所選動作
+- **WHEN** 使用者已被預選 `Squat` 並送出一筆紀錄，使最近一筆紀錄改變
+- **THEN** 所選動作與欄位數值 SHALL 維持不變，使用者可直接再次送出
+
+#### Scenario: 不覆寫使用者已選定的動作
+- **WHEN** 使用者在 `sessions` 載入完成前已自行選定 `Deadlift`
+- **THEN** 系統 SHALL NOT 以最近一筆紀錄的動作覆寫該選擇
+
+#### Scenario: 尚無訓練紀錄時不預選
+- **WHEN** 使用者開啟記錄頁，且尚無任何訓練紀錄
+- **THEN** 所選動作 SHALL 維持為空
 
 ### Requirement: Exact Exercise Name Matching
 動作名稱的比對 SHALL 採精確字串比對，SHALL NOT 進行 trim 或大小寫正規化。

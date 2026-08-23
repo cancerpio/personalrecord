@@ -65,6 +65,40 @@ function toTimestamp(value) {
     return Number.isNaN(t) ? null : t;
 }
 
+// 找出時間序最後的一筆 session：先比 date（YYYY-MM-DD 補零，字典序即時間序），
+// 同日再比 createdAt；任一方缺 createdAt 時退回陣列原順序（後加入者視為較新）。
+// `matches` 為選填的篩選條件，省略時代表看全部紀錄。
+function findLatestSession(sessions, matches) {
+    let best = null;
+    let bestIdx = -1;
+    let bestTs = null;
+
+    (sessions || []).forEach((session, idx) => {
+        if (!session || !session.date) return;
+        if (matches && !matches(session)) return;
+
+        const ts = toTimestamp(session.createdAt);
+
+        if (best === null) {
+            best = session; bestIdx = idx; bestTs = ts;
+            return;
+        }
+
+        let isNewer;
+        if (session.date !== best.date) {
+            isNewer = session.date > best.date;
+        } else if (ts !== null && bestTs !== null) {
+            isNewer = ts > bestTs;
+        } else {
+            isNewer = idx > bestIdx;
+        }
+
+        if (isNewer) { best = session; bestIdx = idx; bestTs = ts; }
+    });
+
+    return best;
+}
+
 export const useSessionStore = defineStore('session', {
     state: () => ({
         sessions: [],
@@ -85,34 +119,15 @@ export const useSessionStore = defineStore('session', {
         // 動作名稱採精確比對，不做 trim／大小寫正規化。
         getLastSetForExercise: (state) => (exerciseName) => {
             if (!exerciseName) return null;
-
-            let best = null;
-            let bestIdx = -1;
-            let bestTs = null;
-
-            state.sessions.forEach((session, idx) => {
-                if (!session || session.exercise !== exerciseName || !session.date) return;
-
-                const ts = toTimestamp(session.createdAt);
-
-                if (best === null) {
-                    best = session; bestIdx = idx; bestTs = ts;
-                    return;
-                }
-
-                let isNewer;
-                if (session.date !== best.date) {
-                    isNewer = session.date > best.date;
-                } else if (ts !== null && bestTs !== null) {
-                    isNewer = ts > bestTs;
-                } else {
-                    isNewer = idx > bestIdx;
-                }
-
-                if (isNewer) { best = session; bestIdx = idx; bestTs = ts; }
-            });
-
+            const best = findLatestSession(state.sessions, s => s.exercise === exerciseName);
             return best ? { weight: best.weight, reps: best.reps } : null;
+        },
+
+        // 最近一筆訓練紀錄的動作名稱，供記錄表單初次載入時預選上次練的動作。
+        // 沿用與「最後一組」相同的時間序判定，兩者永遠指向同一筆紀錄。
+        getLastLoggedExercise: (state) => {
+            const best = findLatestSession(state.sessions);
+            return best ? (best.exercise || null) : null;
         },
 
         // Weekly training volume calculation and trend

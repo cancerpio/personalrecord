@@ -330,6 +330,47 @@ describe('getLastSetForExercise — 帶出該動作的最後一組', () => {
   });
 });
 
+describe('getLastLoggedExercise — 最近一筆紀錄的動作名稱（#11）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('回傳時間序最後一筆紀錄的動作名稱', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-19', exercise: 'Squat', weight: 100, reps: 5, createdAt: 1 },
+      { id: '2', date: '2026-08-22', exercise: 'Bench Press', weight: 80, reps: 8, createdAt: 2 },
+      { id: '3', date: '2026-08-20', exercise: 'Deadlift', weight: 140, reps: 3, createdAt: 3 },
+    ];
+    expect(store.getLastLoggedExercise).toBe('Bench Press');
+  });
+
+  it('同一日時以 createdAt 判定最後一筆', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 5, createdAt: 10 },
+      { id: '2', date: '2026-08-22', exercise: 'Overhead Press', weight: 50, reps: 5, createdAt: 30 },
+      { id: '3', date: '2026-08-22', exercise: 'Bench Press', weight: 80, reps: 8, createdAt: 20 },
+    ];
+    expect(store.getLastLoggedExercise).toBe('Overhead Press');
+  });
+
+  it('缺 createdAt 的舊資料以陣列順序為準（後加入者視為較新）', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: '1', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 5 },
+      { id: '2', date: '2026-08-22', exercise: 'Bench Press', weight: 80, reps: 8 },
+    ];
+    expect(store.getLastLoggedExercise).toBe('Bench Press');
+  });
+
+  it('sessions 為空時回傳 null', () => {
+    const store = useSessionStore();
+    store.sessions = [];
+    expect(store.getLastLoggedExercise).toBeNull();
+  });
+});
+
 // 2026-08-23 回報的實際 bug：畫面顯示「-0.3 kg」，但當週體重其實比上一週高。
 // 以下為當時正式資料的體重快照（Firestore body_metrics），用來釘住修正後的結果。
 describe('體重趨勢 — 2026-08-23 實際資料回歸', () => {

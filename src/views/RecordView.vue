@@ -53,6 +53,20 @@ watch(() => form.exercise, (exerciseName) => {
   form.reps = lastSet ? lastSet.reps : '';
 });
 
+// #11：初次載入時預選「上次記錄的動作」，讓打開記錄頁就已經是上次的最後一組。
+// sessions 是 onMounted 後才非同步取回，元件掛載當下仍是空陣列，
+// 因此用 watch 等資料到位，不能在 onMounted 裡直接設定。
+// 只在使用者尚未選過動作時套用，且僅套用一次——送出紀錄會讓
+// getLastLoggedExercise 改變，但那時不得再覆寫欄位，以維持
+// 「送出後欄位保留、可連續送出同一動作多組」的既有行為。
+let exercisePrefilled = false;
+watch(() => sessionStore.getLastLoggedExercise, (lastExercise) => {
+  if (exercisePrefilled || !lastExercise) return;
+  exercisePrefilled = true;
+  // 設定 form.exercise 會觸發上面的 watch，連帶帶入該動作的最後一組重量與次數。
+  if (!form.exercise) form.exercise = lastExercise;
+}, { immediate: true });
+
 const savedSessions = computed(() => sessionStore.sessions);
 
 // Load from Store on Mount
