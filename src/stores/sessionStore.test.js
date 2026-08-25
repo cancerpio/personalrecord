@@ -474,19 +474,38 @@ describe('exerciseStreaks — 動作連續週數總覽', () => {
     expect(store.exerciseStreaks[0].streakWeeks).toBe(3);
   });
 
-  it('錨點是該動作最後練到的那一週，不是當週', () => {
+  it('錨點是當週：當週沒練但上週有練，仍在持續中', () => {
     const store = useSessionStore();
     store.sessions = [
       s('2026-08-03', 'Deadlift'),
       s('2026-08-10', 'Deadlift'),
       s('2026-08-17', 'Deadlift'),
-      // 當週（2026-08-24）沒有練 Deadlift
+      // 當週（2026-08-24）沒有練 Deadlift，但只空了一週，仍在容許範圍內
     ];
-    // 若錯用當週當錨點會得到 0；正確答案是從 08-17 那週往回數
     expect(store.exerciseStreaks[0].streakWeeks).toBe(3);
   });
 
-  it('連續週數不受 12 週視窗限制，可往回數超過 12 週', () => {
+  it('停練超過容許空窗的動作歸零，但仍列在清單上', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      // 曾經連續 5 週，但最後一筆距當週已超過兩週
+      s('2026-06-01', 'Pull Up'), s('2026-06-08', 'Pull Up'),
+      s('2026-06-15', 'Pull Up'), s('2026-06-22', 'Pull Up'),
+      s('2026-06-29', 'Pull Up'),
+    ];
+    // 舊語意會回傳 5（歷史上的連續）；新語意問的是「現在還持續著嗎」
+    expect(store.exerciseStreaks).toEqual([
+      { exercise: 'Pull Up', streakWeeks: 0, lastDate: '2026-06-29' },
+    ]);
+  });
+
+  it('只在當週練過時回傳 1', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-08-24', 'Squat')];
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(1);
+  });
+
+  it('連續週數上限為 12 週，超過仍顯示 12', () => {
     const store = useSessionStore();
     // 從 2026-05-04 那週起連續 17 週，最後一筆落在當週
     const sessions = [];
@@ -496,25 +515,33 @@ describe('exerciseStreaks — 動作連續週數總覽', () => {
       sessions.push(s(d.toISOString().slice(0, 10), 'Squat'));
     }
     store.sessions = sessions;
-    expect(store.exerciseStreaks[0].streakWeeks).toBe(17);
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(12);
   });
 
-  it('最後練到的那一週落在 12 週視窗外的動作不顯示', () => {
+  it('很久沒練的動作仍會顯示，連續週數為 0', () => {
     const store = useSessionStore();
     store.sessions = [
       s('2026-08-24', 'Squat'),
-      // 視窗起點為 2026-08-24 減 11 週 = 2026-06-08，以下這筆更早
       s('2026-05-25', 'Pull Up'),
     ];
-    expect(store.exerciseStreaks.map(r => r.exercise)).toEqual(['Squat']);
+    expect(store.exerciseStreaks.map(r => `${r.exercise}:${r.streakWeeks}`))
+      .toEqual(['Squat:1', 'Pull Up:0']);
   });
 
-  it('視窗邊界當週本身算在視窗內', () => {
+  it('最多只顯示 12 筆，保留最後練到日期最近的那些', () => {
     const store = useSessionStore();
-    store.sessions = [
-      s('2026-06-08', 'Pull Up'), // 恰為視窗起點那一週
-    ];
-    expect(store.exerciseStreaks.map(r => r.exercise)).toEqual(['Pull Up']);
+    // 14 個動作，最後練到的日期由新到舊各差一天
+    const sessions = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(Date.UTC(2026, 7, 24));
+      d.setUTCDate(d.getUTCDate() - i);
+      sessions.push(s(d.toISOString().slice(0, 10), `Ex${String(i).padStart(2, '0')}`));
+    }
+    store.sessions = sessions;
+    const rows = store.exerciseStreaks;
+    expect(rows).toHaveLength(12);
+    expect(rows[0].exercise).toBe('Ex00');   // 2026-08-24，最近
+    expect(rows[11].exercise).toBe('Ex11');  // 第 12 筆，Ex12/Ex13 被截掉
   });
 
   it('依最後練到日期由新到舊排序，連續週數再大也不會排到較新的日期前面', () => {

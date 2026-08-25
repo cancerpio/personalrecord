@@ -15,9 +15,11 @@ This capability calculates and tracks the weekly training volume and provides co
 - **THEN** the weekly training volume SHALL be 500 (5*50 + 5*30 + 5*20)
 
 ### Requirement: Weekly Grouping Boundary
-系統 SHALL 依每筆訓練紀錄的日期，將其歸入一個「訓練週」；訓練週的範圍為**週一（起）至週日（迄）**。該週所屬的「星期一」SHALL 以 UTC 的星期幾（day-of-week）推導，週日 SHALL 歸入「其前一個週一所開始的那一週」。
+系統 SHALL 依每筆訓練紀錄的 `date` 欄位（`YYYY-MM-DD`），將其歸入一個「訓練週」；訓練週的範圍為**週一（起）至週日（迄）**。週日 SHALL 歸入「其前一個週一所開始的那一週」。
 
-備註（記錄目前已知行為，非正規需求）：由於星期幾以 UTC 判定，對 UTC+8 使用者而言，落在週日深夜至週一凌晨交界的紀錄，可能被歸入相鄰的一週。
+分組的輸入 SHALL 為日期字串本身，SHALL NOT 涉及一天之中的時刻。實作以 `Date.UTC` 進行日曆運算（`getMondayOfDate`），這是為了讓「哪一天是星期幾」不受執行環境時區影響而得到穩定答案，SHALL NOT 解讀為「以 UTC 判定週界」——同一個 `date` 在任何時區都會歸入同一週。
+
+備註（記錄已修正的診斷，非正規需求）：先前版本記載「星期幾以 UTC 判定，UTC+8 使用者在週日深夜至週一凌晨的紀錄可能被歸入相鄰的一週」。經查該敘述有誤：分組不看時刻，不會發生此情形。真正受時區影響的是**記錄表單的預設日期**如何從當下時間取得今天（見 `src/utils/date.js` 的 `todayLocalISO`），該處原本用 UTC 取日期，已修正為本地日期。
 
 #### Scenario: Sunday belongs to the week that started the previous Monday
 - **WHEN** a training session is dated 2026-07-05 (a Sunday)
@@ -132,7 +134,7 @@ This capability calculates and tracks the weekly training volume and provides co
 - **THEN** 系統 SHALL 顯示該週的日期範圍與容積數值
 
 ### Requirement: Provide Trailing 12-Week Average Body Weight
-系統 SHALL 在最近 12 週的序列中，為每一週提供該週的平均體重 `avgBodyWeight`。每一週的平均體重 SHALL 為該週（週一到週日，沿用既有 UTC 週邊界）內所有體重紀錄 `bodyWeight` 的算術平均；**該週若無任何體重紀錄，`avgBodyWeight` SHALL 為 `null`**（不得補 0，不得內插）。此欄位 SHALL 以新增方式提供，不影響既有 12 週容積序列欄位。
+系統 SHALL 在最近 12 週的序列中，為每一週提供該週的平均體重 `avgBodyWeight`。每一週的平均體重 SHALL 為該週（週一到週日，沿用既有週邊界定義）內所有體重紀錄 `bodyWeight` 的算術平均；**該週若無任何體重紀錄，`avgBodyWeight` SHALL 為 `null`**（不得補 0，不得內插）。此欄位 SHALL 以新增方式提供，不影響既有 12 週容積序列欄位。
 
 #### Scenario: 週平均為該週體重紀錄之平均
 - **WHEN** 某一週內有體重紀錄 76.0 與 78.0

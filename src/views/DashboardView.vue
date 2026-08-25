@@ -394,7 +394,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 動作連續週數：與容積、體重同屬「這週該知道的事」，放在頂部摘要區 -->
+    <!-- 最近動作連續週數：與容積、體重同屬「這週該知道的事」，放在頂部摘要區 -->
     <ExerciseStreakList :rows="exerciseStreaks" />
 
     <!-- Sparklines (Performance Trends) -->

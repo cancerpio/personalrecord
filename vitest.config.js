@@ -4,6 +4,9 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.{test,spec}.js']
+    include: ['src/**/*.{test,spec}.js'],
+    // 釘住時區。本專案有「本地日期 vs UTC 日期」的邏輯，
+    // 跟著執行機器的時區跑會讓測試在 CI 與本機得到不同結果。
+    env: { TZ: 'Asia/Taipei' }
   }
 })
