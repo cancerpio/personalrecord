@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import HistoryChart from '../components/HistoryChart.vue';
 import FilterControls from '../components/FilterControls.vue';
 import SparklineRow from '../components/SparklineRow.vue';
+import ExerciseStreakList from '../components/ExerciseStreakList.vue';
 import { useSessionStore } from '../stores/sessionStore.js';
 import { signed } from '../utils/format.js';
 
@@ -12,6 +13,7 @@ const volumeInfo = computed(() => sessionStore.weeklyTrainingVolumeInfo);
 
 // Trailing 12-week volume series for the bar chart
 const volume12 = computed(() => sessionStore.trailing12WeekVolumeInfo);
+const exerciseStreaks = computed(() => sessionStore.exerciseStreaks);
 const hasAnyBodyWeight = computed(() => volume12.value.weeks.some(w => w.avgBodyWeight != null));
 
 // ---- 標頭雙欄摘要 ----
@@ -391,6 +393,9 @@ onMounted(() => {
         <span class="history-average">過去 12 個完整週平均：{{ volume12.average.toLocaleString() }} kg／週（不含本週）</span>
       </div>
     </div>
+
+    <!-- 動作連續週數：與容積、體重同屬「這週該知道的事」，放在頂部摘要區 -->
+    <ExerciseStreakList :rows="exerciseStreaks" />
 
     <!-- Sparklines (Performance Trends) -->
     <div class="sparklines-container" :class="{ refreshing: loading }">
