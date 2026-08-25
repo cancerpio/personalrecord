@@ -577,7 +577,7 @@ Run: `npm run dev`
 - 切換系統深色模式後配色正常（顏色皆走 `main.css` 的 token）
 
 **預期看到的內容**（以 2026-08-25 的正式資料為準，共 11 行）：
-`Squat 18`、`Overhead Press 7`、`Bench Press 6` 為紅色；
+`Squat 16`、`Overhead Press 7`、`Bench Press 6` 為紅色；
 `Barbell Row 3`、`Barbell Overhead Press 3` 為琥珀色；其餘為一般色。
 
 - [ ] **Step 6: 提醒使用者 commit**

@@ -171,11 +171,18 @@
 
 ### 2026-08-23 的查證結果
 
-**方法**：透過 Firebase 官方 MCP server（`firebase mcp`，白名單只開唯讀工具）讀取 Firestore 的 `training_sessions`，全量 427 筆，只取 `exercise` 與 `date` 兩個欄位。資料期間 2026-03-21 ～ 2026-08-23。
+**方法**：透過 Firebase 官方 MCP server（`firebase mcp`，白名單只開唯讀工具）讀取 Firestore 的 `training_sessions`，只取 `exercise` 與 `date` 兩個欄位。
+
+> **2026-08-25 更正**：本節初版誤用「全量 432 筆」計算。`training_sessions` 是共用的
+> top-level collection，其中只有 **373 筆**屬於本使用者（app 透過 `getSessions(userId)`
+> 只會取到自己那些），其餘為另一帳號在 2026-03-21～04-02 的紀錄。以下數字皆已改為
+> **加上 `userId` 過濾後的結果**。往後任何直接查 Firestore 的分析都必須加此條件。
+
+**資料**：373 筆（已過濾 `userId`），期間 2026-04-03 ～ 2026-08-24。
 
 #### 好消息：字串本身很乾淨
 
-427 筆共 13 種名稱，以下分岔類型**全部零命中**：
+373 筆共 13 種名稱，以下分岔類型**全部零命中**：
 
 | 檢查項目 | 結果 |
 |---|---|
@@ -192,11 +199,11 @@
 
 | 動作名稱 | 筆數 | 是否在內建清單 |
 |---|---|---|
-| Squat | 105 | ✓ |
-| Bench Press | 67 | ✓ |
-| Barbell Row | 59 | ✓ |
-| **Overhead Press** | **52** | ✓ |
-| Deadlift | 41 | ✓ |
+| Squat | 81 | ✓ |
+| Bench Press | 64 | ✓ |
+| Barbell Row | 46 | ✓ |
+| **Overhead Press** | **40** | ✓ |
+| Deadlift | 39 | ✓ |
 | Hang Clean | 28 | ✗ |
 | **Barbell Overhead Press** | **26** | ✗ |
 | RDL | 18 | ✗ |
@@ -210,7 +217,7 @@
 
 | 期間 | 使用的名稱 |
 |---|---|
-| 2026-03-27 ～ 05-24 | `Overhead Press` |
+| 2026-04-03 ～ 05-24 | `Overhead Press` |
 | 2026-05-26 ～ 05-31 | `Barbell Overhead Press` |
 | 2026-06-04 ～ 07-05 | `Overhead Press` |
 | 2026-07-16 | `Dumbell Overhead Press`（啞鈴，是不同動作） |
@@ -226,7 +233,7 @@
 
 #### 不是分岔的部分
 
-`Squat`(105) 與 `Split Squat`(8) 是真的兩個不同動作，不需要合併 —— 08-15 / 08-21 練分腿蹲、08-16 練深蹲，正是 #2 想鼓勵的「變化動作」行為，資料上看得出來已經在做了。`Bench Press` 與 `Dumbbell Bench Press` 同理。
+`Squat`(81) 與 `Split Squat`(8) 是真的兩個不同動作，不需要合併 —— 08-15 / 08-21 練分腿蹲、08-16 練深蹲，正是 #2 想鼓勵的「變化動作」行為，資料上看得出來已經在做了。`Bench Press` 與 `Dumbbell Bench Press` 同理。
 
 #### 一個結構性問題：選單清單與歷史資料是兩份獨立的東西
 
@@ -235,16 +242,16 @@
 | | 資料來源 | 內容 |
 |---|---|---|
 | 下拉選單顯示什麼 | `src/constants.js` 的 `BASE_EXERCISES`（8 個寫死的動作）＋ 該裝置 localStorage 的 `PR_CUSTOM_EXERCISES` | Squat, Bench Press, Deadlift, Overhead Press, Barbell Row, Pull Up, Chin Up, Dips（＋自訂） |
-| 實際記錄了什麼 | Firestore 的 `training_sessions` | 427 筆、13 種動作 |
+| 實際記錄了什麼 | Firestore 的 `training_sessions` | 373 筆、13 種動作 |
 
 `SearchableDropdown.vue` 的 `allOptions` 是 `customOptions + props.options`，而 `RecordView.vue:243` 傳進去的是 `BASE_EXERCISES`。**`sessions` 從頭到尾沒有參與過。**
 
 造成兩個後果：
 
 1. **練過的動作不會出現在選單裡。** 有 101 筆、7 個動作不在內建清單上（Hang Clean 28、Barbell Overhead Press 26、RDL 18、Hang Snatch 16、Split Squat 8、Dumbell Overhead Press 4、Dumbbell Bench Press 1）。換一台裝置或清掉瀏覽器資料後，這些動作在選單裡就消失了，只能重打。
-2. **防重複的檢查看不到歷史資料。** 打新名字時，`canAdd` 只拿那 8 個內建動作 + localStorage 比對，不會去看 427 筆紀錄。所以即使某個名稱已經用過 26 次，只要 localStorage 沒記著，它還是會跳出「Add "..."」，當成全新動作加進去。
+2. **防重複的檢查看不到歷史資料。** 打新名字時，`canAdd` 只拿那 8 個內建動作 + localStorage 比對，不會去看 373 筆紀錄。所以即使某個名稱已經用過 26 次，只要 localStorage 沒記著，它還是會跳出「Add "..."」，當成全新動作加進去。
 
-反過來看，內建清單裡的 `Chin Up` 與 `Dips` 在 427 筆中一次都沒被使用過。
+反過來看，內建清單裡的 `Chin Up` 與 `Dips` 在 373 筆中一次都沒被使用過。
 
 #### 查證的限制與推論
 
@@ -270,16 +277,16 @@
 
 這一步不做的話前面會白費：就算把資料清理乾淨，內建清單裡的舊名稱還在，下次還是會選到它，馬上再分岔一次。可以順便檢討從未使用過的 `Chin Up` 與 `Dips`。
 
-**(c) 一次性資料清理**（最多 56 筆）
+**(c) 一次性資料清理**（最多 44 筆）
 
 | 項目 | 筆數 | 需要判斷嗎 |
 |---|---|---|
-| `Overhead Press` → `Barbell Overhead Press` | 52 | 否，已確認是同一動作 |
+| `Overhead Press` → `Barbell Overhead Press` | 40 | 否，已確認是同一動作 |
 | `Dumbell Overhead Press` → `Dumbbell Overhead Press` | 4 | 否，純粹拼字錯誤 |
 
-範圍比原本擔心的小很多 —— 是 56 筆，不是全部 427 筆。
+範圍比原本擔心的小很多 —— 是 44 筆（`Overhead Press` 40 筆 + `Dumbell` 拼字 4 筆），不是全部 373 筆。
 
-**執行方式的建議**：暫時把 `firestore_update_document` 加進 `.mcp.json` 的白名單、做完後拿掉。每一次寫入都會經過 MCP 權限流程、看得到也可以拒絕。動手前先把這 56 筆的 docId 列出來存檔，萬一改錯可以照著還原。
+**執行方式的建議**：暫時把 `firestore_update_document` 加進 `.mcp.json` 的白名單、做完後拿掉。每一次寫入都會經過 MCP 權限流程、看得到也可以拒絕。動手前先把這 44 筆的 docId 列出來存檔，萬一改錯可以照著還原。
 
 **順序**：(a) 和 (b) 是純前端、無風險，應該先做；(c) 動到正式資料，可以晚一點單獨處理。先做 (a)(b) 的好處是，就算舊資料還沒清，至少不會再製造新的分岔。
 
@@ -585,7 +592,7 @@ chip 三態（`delta` = 當週平均 − 過去 12 週平均，先四捨五入�
 2. **#11** 記住上次選的動作（半天，#1 的最後一哩，立刻有感；不需要等 #12）
 3. **#12 (a)(b)** 選單改從 sessions 推導 + `constants.js` 改名（純前端、無風險，做完就不會再產生新的名稱分岔）
 4. **#2 + #13** 動作變化通知與動作注意事項提示（主菜；先走 brainstorming 把 #2 的規則問題定案，兩者的提示 UI 一起設計）
-5. **#12 (c)** 56 筆資料清理（動到正式資料，單獨處理，建議排在 #2/#13 開工前完成）
+5. **#12 (c)** 44 筆資料清理（動到正式資料，單獨處理，建議排在 #2/#13 開工前完成）
 6. **#4** backend CI ＋ **#10** 元件測試基礎設施（順手，之後都受益）
 7. **#3** 資料匯出
 8. **#14** 訓練筆記（需要 #4 先完成）
