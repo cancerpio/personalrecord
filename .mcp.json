@@ -5,7 +5,7 @@
       "args": [
         "mcp",
         "--dir", "backend",
-        "--tools", "firestore_list_documents,firestore_query_collection,firestore_run_aggregation_query,firestore_get_document"
+        "--tools", "firestore_list_documents,firestore_query_collection,firestore_run_aggregation_query,firestore_get_document,firestore_update_document"
       ]
     }
   }

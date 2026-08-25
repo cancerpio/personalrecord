@@ -1,5 +1,6 @@
 export const BASE_EXERCISES = [
-    'Squat',
+    'High Bar Squat',
+    'Low Bar Squat',
     'Bench Press',
     'Deadlift',
     'Overhead Press',
