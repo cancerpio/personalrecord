@@ -18,13 +18,13 @@ function levelOf(weeks) {
 <template>
   <div class="streak-section">
     <div class="streak-header">
-      <h2>動作連續週數</h2>
-      <p class="streak-desc">同一動作連續幾週沒換過。數字越大代表該受力結構被連續使用越久，可考慮安排變化動作。</p>
+      <h2>最近動作連續週數</h2>
+      <p class="streak-desc">同一動作目前連續幾週沒換過，最多列出最近練到的 12 個動作。數字越大代表該受力結構被連續使用越久，可考慮安排變化動作；歸零代表已中斷。</p>
     </div>
 
     <div class="streak-panel glass-panel">
       <div v-if="rows.length === 0" class="streak-empty">
-        最近 12 週內尚無訓練紀錄
+        尚無訓練紀錄
       </div>
 
       <template v-else>

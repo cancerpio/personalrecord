@@ -1,5 +1,10 @@
 # 動作連續週數總覽 Implementation Plan
 
+> **狀態：已執行完畢，且其中的設計決策已於同日被推翻。請勿再依本計畫實作。**
+> 錨點、視窗過濾、排序與週數上限均已變更；系統當前行為以
+> [`openspec/specs/exercise-streak-overview/spec.md`](../../../openspec/specs/exercise-streak-overview/spec.md) 為準。
+> 本文保留作為當時的執行紀錄。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 Dashboard 的 12 週容積長條圖下方，用一張表顯示每個動作「連續幾週沒換過」，只顯示、不通知。

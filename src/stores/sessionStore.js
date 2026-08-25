@@ -29,12 +29,16 @@ function shiftWeeks(mondayStr, deltaWeeks) {
 // 使用者不會每週都練同一個動作，中間本來就有空窗週，
 // 嚴格連續會讓幾乎所有動作都停在 1~3，指標失去意義。
 const MAX_GAP_WEEKS = 1;
+
+// 連續週數上限。12 週約一季，到這個長度時「該換動作」的訊號早已成立，
+// 再往上累加不會改變任何決策——順帶避免資料很長時整段往回掃。
+const MAX_STREAK_WEEKS = 12;
+
 function computeStreakWeeks(weekSet, anchorMonday) {
-    if (!weekSet.has(anchorMonday)) return 0;
     let count = 0;
     let misses = 0;
     let cursor = anchorMonday;
-    while (true) {
+    while (count < MAX_STREAK_WEEKS) {
         if (weekSet.has(cursor)) {
             count += 1;
             misses = 0;
@@ -165,18 +169,18 @@ export const useSessionStore = defineStore('session', {
             return best ? (best.exercise || null) : null;
         },
 
-        // 每個動作「連續幾週沒換過」，供 Dashboard 的動作連續週數總覽顯示。
+        // 每個動作「目前連續幾週沒換過」，供 Dashboard 的最近動作連續週數總覽顯示。
         // 產品意圖是結構性負荷輪替（同一受力結構被連續使用多久），不是偵測停滯，
         // 因此不看重量變化——重量在漲反而讓關節承受的絕對負荷更大。
         //
-        // 視窗（最近 12 週、含當週）只決定「這個動作要不要顯示」；
-        // 連續週數本身不受視窗限制，可往回數超過 12 週。
-        // 視窗回答「這個動作還在練嗎」，連續週數回答「它已經連續多久沒換」。
+        // 錨點是「當週」而非該動作最後練到的那一週：要回答的是「現在還持續著嗎」，
+        // 不是「歷史上曾經連續過幾週」。停練超過容許空窗後歸零，
+        // 但該動作仍會列出（連續週數 0），讓最近練了什麼一眼看完。
         //
         // 刻意不做動作名稱別名合併：Overhead Press 與 Barbell Overhead Press
         // 會分成兩行，讓名稱分岔問題直接顯示在畫面上，而不是靜靜地壞在背後。
         exerciseStreaks: (state) => {
-            const WINDOW_WEEKS = 12;
+            const MAX_ROWS = 12;
 
             // 依動作彙整「有練到的週」與「實際最後訓練日」
             const byExercise = {};
@@ -192,19 +196,17 @@ export const useSessionStore = defineStore('session', {
 
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const windowStart = shiftWeeks(getMondayOfDate(todayStr), -(WINDOW_WEEKS - 1));
+            const currentMonday = getMondayOfDate(todayStr);
 
             return Object.keys(byExercise)
                 .map(exercise => {
                     const { weeks, lastDate } = byExercise[exercise];
                     return {
                         exercise,
-                        streakWeeks: computeStreakWeeks(weeks, getMondayOfDate(lastDate)),
+                        streakWeeks: computeStreakWeeks(weeks, currentMonday),
                         lastDate,
                     };
                 })
-                // 最後練到的那一週落在視窗內才顯示（等價於「視窗內任一週有紀錄」）
-                .filter(row => getMondayOfDate(row.lastDate) >= windowStart)
                 // 最近練的動作優先：先比最後練到的日期（新到舊），
                 // 同日再比連續週數（大到小），皆相同時依動作名字典序確保順序穩定。
                 // 刻意讓日期壓過連續週數——使用者要先看到自己最近在練什麼；
@@ -212,7 +214,10 @@ export const useSessionStore = defineStore('session', {
                 .sort((a, b) =>
                     b.lastDate.localeCompare(a.lastDate)
                     || b.streakWeeks - a.streakWeeks
-                    || a.exercise.localeCompare(b.exercise));
+                    || a.exercise.localeCompare(b.exercise))
+                // 動作數量沒有上限（可自由輸入名稱），清單長度必須有界，
+                // 否則久了會變成一份無人閱讀的全動作清冊。取最近的 12 筆。
+                .slice(0, MAX_ROWS);
         },
 
         // Weekly training volume calculation and trend
