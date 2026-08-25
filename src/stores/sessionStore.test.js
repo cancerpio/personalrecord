@@ -517,15 +517,31 @@ describe('exerciseStreaks — 動作連續週數總覽', () => {
     expect(store.exerciseStreaks.map(r => r.exercise)).toEqual(['Pull Up']);
   });
 
-  it('依連續週數由大到小排序，同分時依動作名字典序', () => {
+  it('依最後練到日期由新到舊排序，連續週數再大也不會排到較新的日期前面', () => {
     const store = useSessionStore();
     store.sessions = [
-      s('2026-08-24', 'Zercher Squat'),                              // 1 週
-      s('2026-08-17', 'Bench Press'), s('2026-08-24', 'Bench Press'), // 2 週
-      s('2026-08-24', 'Ab Wheel'),                                   // 1 週
+      s('2026-08-24', 'Ab Wheel'),                                    // 1 週，08-24
+      s('2026-08-17', 'Bench Press'), s('2026-08-24', 'Bench Press'), // 2 週，08-24
+      // Squat 連續 5 週但最後練到 08-21，仍排在 08-24 那兩個之後
+      s('2026-07-20', 'Squat'), s('2026-07-27', 'Squat'),
+      s('2026-08-03', 'Squat'), s('2026-08-10', 'Squat'),
+      s('2026-08-21', 'Squat'),
     ];
-    expect(store.exerciseStreaks.map(r => `${r.exercise}:${r.streakWeeks}`))
-      .toEqual(['Bench Press:2', 'Ab Wheel:1', 'Zercher Squat:1']);
+    expect(store.exerciseStreaks.map(r => `${r.exercise}:${r.streakWeeks}:${r.lastDate}`))
+      .toEqual([
+        'Bench Press:2:2026-08-24',  // 同為 08-24，連續週數較大者在前
+        'Ab Wheel:1:2026-08-24',
+        'Squat:5:2026-08-21',        // 日期較舊，即使連續 5 週仍排在後面
+      ]);
+  });
+
+  it('日期與連續週數皆相同時依動作名字典序，確保順序穩定', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-24', 'Zercher Squat'),
+      s('2026-08-24', 'Ab Wheel'),
+    ];
+    expect(store.exerciseStreaks.map(r => r.exercise)).toEqual(['Ab Wheel', 'Zercher Squat']);
   });
 
   it('同一週練多次只算一週', () => {

@@ -205,8 +205,14 @@ export const useSessionStore = defineStore('session', {
                 })
                 // 最後練到的那一週落在視窗內才顯示（等價於「視窗內任一週有紀錄」）
                 .filter(row => getMondayOfDate(row.lastDate) >= windowStart)
-                // 連續週數由大到小；同分時依動作名字典序，確保順序穩定可測
-                .sort((a, b) => b.streakWeeks - a.streakWeeks || a.exercise.localeCompare(b.exercise));
+                // 最近練的動作優先：先比最後練到的日期（新到舊），
+                // 同日再比連續週數（大到小），皆相同時依動作名字典序確保順序穩定。
+                // 刻意讓日期壓過連續週數——使用者要先看到自己最近在練什麼；
+                // 高連續週數仍會以文字顏色標示，不會因排在後面而看不見。
+                .sort((a, b) =>
+                    b.lastDate.localeCompare(a.lastDate)
+                    || b.streakWeeks - a.streakWeeks
+                    || a.exercise.localeCompare(b.exercise));
         },
 
         // Weekly training volume calculation and trend
