@@ -4,19 +4,20 @@ import { useRouter } from 'vue-router';
 import SearchableDropdown from '../components/SearchableDropdown.vue';
 import { BASE_EXERCISES } from '../constants.js';
 import { useSessionStore } from '../stores/sessionStore.js';
+import { todayLocalISO } from '../utils/date.js';
 
 const router = useRouter();
 const sessionStore = useSessionStore();
 
 const form = reactive({
-  date: new Date().toISOString().split('T')[0],
+  date: todayLocalISO(),
   exercise: '',
   weight: '',
   reps: ''
 });
 
 const fatForm = reactive({
-  date: new Date().toISOString().split('T')[0],
+  date: todayLocalISO(),
   fatPercentage: '',
   bodyWeight: ''
 });

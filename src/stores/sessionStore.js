@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { api } from '../services/api';
+import { todayLocalISO } from '../utils/date.js';
 
 function getMondayOfDate(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -194,8 +195,7 @@ export const useSessionStore = defineStore('session', {
                 if (session.date > entry.lastDate) entry.lastDate = session.date;
             });
 
-            const now = new Date();
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const todayStr = todayLocalISO();
             const currentMonday = getMondayOfDate(todayStr);
 
             return Object.keys(byExercise)
@@ -231,11 +231,7 @@ export const useSessionStore = defineStore('session', {
                 weeklyVolumes[monday] = (weeklyVolumes[monday] || 0) + vol;
             });
 
-            const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-            const todayStr = `${y}-${m}-${d}`;
+            const todayStr = todayLocalISO();
             const currentMonday = getMondayOfDate(todayStr);
 
             const currentVolume = weeklyVolumes[currentMonday] || 0;
@@ -328,8 +324,7 @@ export const useSessionStore = defineStore('session', {
 
             const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
 
-            const now = new Date();
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const todayStr = todayLocalISO();
             const currentMonday = getMondayOfDate(todayStr);
             const [cy, cm, cd] = currentMonday.split('-').map(Number);
             const currentMondayDate = new Date(Date.UTC(cy, cm - 1, cd));
