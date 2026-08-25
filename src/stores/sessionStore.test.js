@@ -414,3 +414,152 @@ describe('體重趨勢 — 2026-08-23 實際資料回歸', () => {
     expect(info.bodyWeightTrend).toBe('stable');
   });
 });
+
+describe('exerciseStreaks — 動作連續週數總覽', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    // 當週 = 2026-08-24（週一）那一週
+    vi.setSystemTime(new Date('2026-08-25T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // 產生一筆紀錄的小工具，避免每個測試重複打字。
+  const s = (date, exercise) => ({ id: `${exercise}-${date}`, date, exercise, weight: 100, reps: 5 });
+
+  it('連續三週皆有紀錄時回傳 3', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-10', 'Squat'),
+      s('2026-08-17', 'Squat'),
+      s('2026-08-24', 'Squat'),
+    ];
+    expect(store.exerciseStreaks).toEqual([
+      { exercise: 'Squat', streakWeeks: 3, lastDate: '2026-08-24' },
+    ]);
+  });
+
+  it('中間連空一週仍算連續，且空週不計入週數', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-10', 'Squat'),
+      // 2026-08-17 那週沒練
+      s('2026-08-24', 'Squat'),
+    ];
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(2);
+  });
+
+  it('中間連空兩週即斷開，只算最近那一段', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-03', 'Squat'),
+      // 2026-08-10、2026-08-17 兩週都沒練
+      s('2026-08-24', 'Squat'),
+    ];
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(1);
+  });
+
+  it('允許的是「每次最多連空一週」，不是「整段只能空一週」', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-07-27', 'Squat'),
+      // 2026-08-03 空
+      s('2026-08-10', 'Squat'),
+      // 2026-08-17 空
+      s('2026-08-24', 'Squat'),
+    ];
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(3);
+  });
+
+  it('錨點是該動作最後練到的那一週，不是當週', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-03', 'Deadlift'),
+      s('2026-08-10', 'Deadlift'),
+      s('2026-08-17', 'Deadlift'),
+      // 當週（2026-08-24）沒有練 Deadlift
+    ];
+    // 若錯用當週當錨點會得到 0；正確答案是從 08-17 那週往回數
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(3);
+  });
+
+  it('連續週數不受 12 週視窗限制，可往回數超過 12 週', () => {
+    const store = useSessionStore();
+    // 從 2026-05-04 那週起連續 17 週，最後一筆落在當週
+    const sessions = [];
+    for (let i = 0; i < 17; i++) {
+      const d = new Date(Date.UTC(2026, 4, 4));
+      d.setUTCDate(d.getUTCDate() + i * 7);
+      sessions.push(s(d.toISOString().slice(0, 10), 'Squat'));
+    }
+    store.sessions = sessions;
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(17);
+  });
+
+  it('最後練到的那一週落在 12 週視窗外的動作不顯示', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-24', 'Squat'),
+      // 視窗起點為 2026-08-24 減 11 週 = 2026-06-08，以下這筆更早
+      s('2026-05-25', 'Pull Up'),
+    ];
+    expect(store.exerciseStreaks.map(r => r.exercise)).toEqual(['Squat']);
+  });
+
+  it('視窗邊界當週本身算在視窗內', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-06-08', 'Pull Up'), // 恰為視窗起點那一週
+    ];
+    expect(store.exerciseStreaks.map(r => r.exercise)).toEqual(['Pull Up']);
+  });
+
+  it('依連續週數由大到小排序，同分時依動作名字典序', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-24', 'Zercher Squat'),                              // 1 週
+      s('2026-08-17', 'Bench Press'), s('2026-08-24', 'Bench Press'), // 2 週
+      s('2026-08-24', 'Ab Wheel'),                                   // 1 週
+    ];
+    expect(store.exerciseStreaks.map(r => `${r.exercise}:${r.streakWeeks}`))
+      .toEqual(['Bench Press:2', 'Ab Wheel:1', 'Zercher Squat:1']);
+  });
+
+  it('同一週練多次只算一週', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: 'a', date: '2026-08-24', exercise: 'Squat', weight: 100, reps: 5 },
+      { id: 'b', date: '2026-08-24', exercise: 'Squat', weight: 105, reps: 3 },
+      { id: 'c', date: '2026-08-25', exercise: 'Squat', weight: 110, reps: 1 },
+    ];
+    expect(store.exerciseStreaks[0].streakWeeks).toBe(1);
+  });
+
+  it('lastDate 回傳實際訓練日，不是該週的週一', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-08-25', 'Squat')]; // 該週週一為 2026-08-24
+    expect(store.exerciseStreaks[0].lastDate).toBe('2026-08-25');
+  });
+
+  it('sessions 為空時回傳空陣列', () => {
+    const store = useSessionStore();
+    store.sessions = [];
+    expect(store.exerciseStreaks).toEqual([]);
+  });
+
+  it('缺 date 或缺 exercise 的紀錄被略過且不拋錯', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: 'a', exercise: 'Squat', weight: 100, reps: 5 },   // 無 date
+      { id: 'b', date: '2026-08-24', weight: 100, reps: 5 },  // 無 exercise
+      null,
+      s('2026-08-24', 'Bench Press'),
+    ];
+    expect(store.exerciseStreaks).toEqual([
+      { exercise: 'Bench Press', streakWeeks: 1, lastDate: '2026-08-24' },
+    ]);
+  });
+});
