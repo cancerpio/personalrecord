@@ -12,6 +12,41 @@ function getMondayOfDate(dateStr) {
     return `${monday.getUTCFullYear()}-${mm}-${dd}`;
 }
 
+// 以週為單位平移一個「YYYY-MM-DD」週一字串。沿用 UTC，與 getMondayOfDate 同基準。
+function shiftWeeks(mondayStr, deltaWeeks) {
+    const [y, m, d] = mondayStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + deltaWeeks * 7);
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    return `${dt.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+// 連續週數：自錨點那一週往回逐週檢查。
+// 「該週有練」計入並把連續未命中歸零；「該週沒練」則未命中 +1，
+// 連續未命中超過 MAX_GAP_WEEKS 即停止。
+// 亦即允許「每次最多連空一週」，而非「整段期間只能空一週」——
+// 使用者不會每週都練同一個動作，中間本來就有空窗週，
+// 嚴格連續會讓幾乎所有動作都停在 1~3，指標失去意義。
+const MAX_GAP_WEEKS = 1;
+function computeStreakWeeks(weekSet, anchorMonday) {
+    if (!weekSet.has(anchorMonday)) return 0;
+    let count = 0;
+    let misses = 0;
+    let cursor = anchorMonday;
+    while (true) {
+        if (weekSet.has(cursor)) {
+            count += 1;
+            misses = 0;
+        } else {
+            misses += 1;
+            if (misses > MAX_GAP_WEEKS) break;
+        }
+        cursor = shiftWeeks(cursor, -1);
+    }
+    return count;
+}
+
 // 依週分組計算每週平均體重（沿用相同的 UTC 週邊界）。
 // 回傳 { '<週一>': 平均體重 }，僅包含有紀錄的週。
 function getWeeklyBodyWeightAverages(bodyMetrics) {
@@ -128,6 +163,50 @@ export const useSessionStore = defineStore('session', {
         getLastLoggedExercise: (state) => {
             const best = findLatestSession(state.sessions);
             return best ? (best.exercise || null) : null;
+        },
+
+        // 每個動作「連續幾週沒換過」，供 Dashboard 的動作連續週數總覽顯示。
+        // 產品意圖是結構性負荷輪替（同一受力結構被連續使用多久），不是偵測停滯，
+        // 因此不看重量變化——重量在漲反而讓關節承受的絕對負荷更大。
+        //
+        // 視窗（最近 12 週、含當週）只決定「這個動作要不要顯示」；
+        // 連續週數本身不受視窗限制，可往回數超過 12 週。
+        // 視窗回答「這個動作還在練嗎」，連續週數回答「它已經連續多久沒換」。
+        //
+        // 刻意不做動作名稱別名合併：Overhead Press 與 Barbell Overhead Press
+        // 會分成兩行，讓名稱分岔問題直接顯示在畫面上，而不是靜靜地壞在背後。
+        exerciseStreaks: (state) => {
+            const WINDOW_WEEKS = 12;
+
+            // 依動作彙整「有練到的週」與「實際最後訓練日」
+            const byExercise = {};
+            state.sessions.forEach(session => {
+                if (!session || !session.date || !session.exercise) return;
+                let entry = byExercise[session.exercise];
+                if (!entry) {
+                    entry = byExercise[session.exercise] = { weeks: new Set(), lastDate: session.date };
+                }
+                entry.weeks.add(getMondayOfDate(session.date));
+                if (session.date > entry.lastDate) entry.lastDate = session.date;
+            });
+
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const windowStart = shiftWeeks(getMondayOfDate(todayStr), -(WINDOW_WEEKS - 1));
+
+            return Object.keys(byExercise)
+                .map(exercise => {
+                    const { weeks, lastDate } = byExercise[exercise];
+                    return {
+                        exercise,
+                        streakWeeks: computeStreakWeeks(weeks, getMondayOfDate(lastDate)),
+                        lastDate,
+                    };
+                })
+                // 最後練到的那一週落在視窗內才顯示（等價於「視窗內任一週有紀錄」）
+                .filter(row => getMondayOfDate(row.lastDate) >= windowStart)
+                // 連續週數由大到小；同分時依動作名字典序，確保順序穩定可測
+                .sort((a, b) => b.streakWeeks - a.streakWeeks || a.exercise.localeCompare(b.exercise));
         },
 
         // Weekly training volume calculation and trend
