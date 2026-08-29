@@ -109,6 +109,11 @@ implement-revert-point.txt
 /internal/
 
 # Claude setting
-/.claude
+# .claude：skills 與 commands 納入版控（既有的 openspec skill 本來就在追蹤中），
+# 其餘（settings.json、settings.local.json 等本機設定）維持忽略。
+# 原本整個 /.claude 被忽略，導致新增的 skill 會靜默地進不了 commit。
+/.claude/*
+!/.claude/skills/
+!/.claude/commands/
 # Superpowers SDD scratch ledger
 .superpowers/
