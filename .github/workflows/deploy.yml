@@ -1,17 +1,19 @@
-name: Deploy to GitHub Pages
+name: CI / Deploy to GitHub Pages
 
 on:
+  # 只有 main 會走到部署。其他分支若要驗證，開 PR 即可。
   push:
-    branches: [main, master, mini-app, "feat/**"]
+    branches: [main]
+  # PR 上跑 build + test，作為 review 前的 gate；不部署。
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# 每個 ref 各自一組，避免 PR 的 run 取消掉正在進行的 main 部署。
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -47,7 +49,13 @@ jobs:
 
   deploy:
     needs: build
+    # 只從 main 的 push 部署。少了這個條件，推 feature branch 就會把
+    # 未經 review 的程式碼發布到正式站（2026-08 實際發生過數次）。
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

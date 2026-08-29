@@ -27,7 +27,7 @@
 | 12 | 動作身分一致性 | 中高 | ★★★★ | 地基（#13、#2 的前置） | [ ] |
 | 13 | 動作注意事項提示 | 中高 | ★★★★ | 與 #2 一起設計 UI | [ ] |
 | 3 | 撈出訓練資料的 API / 匯出 | 中高 | ★★★★ | 地基 | [ ] |
-| 4 | CI 收斂到界線內（4a 做／4b 暫緩） | 中高 | ★★★★★ | 地基（內含已查證的部署問題） | [ ] |
+| 4 | CI 收斂到界線內（4a 完成／4b 暫緩） | 中高 | ★★★★★ | 地基（部署問題已修） | [x] 4a 完成 |
 | 10 | 前端元件測試基礎設施 | 中 | ★★★★ | 地基 | [ ] |
 | 5 | MCP | 中 | ★★★★★ | 之後（唯讀查詢已可用，剩語意層） | [ ] 部分完成 |
 | 14 | 訓練筆記 | 中 | ★★★ | 之後（#4 之後） | [ ] |
@@ -413,15 +413,29 @@
 
 單人使用、且通常很快被 main 蓋掉，目前實際傷害小。但**分支放久就是長時間跑未 review 的版本**；而且若採用「agent 開 PR」的流程（見下方 #4a），等同**讓 agent 直接部署到正式站**。這一項要先於任何 agent 化工作。
 
-### (a) 界線內：一次性做完就結束
+### (a) 界線內：一次性做完就結束 ✅ 完成（2026-08-29）
 
-改一個檔案同時解決三件事——
+改一個檔案（`.github/workflows/deploy.yml`）同時解決四件事——
 
 - `on` 改為 `push: branches: [main]` **加上** `pull_request:`，讓測試在 PR 上跑。
+  順帶移除已死的 `master` 與 `mini-app`（兩者最後 commit 都停在 2026-03-09，
+  近 30 次部署中未曾出現）。
 - `deploy` job 加條件：`if: github.ref == 'refs/heads/main' && github.event_name == 'push'`。
-- build job 補一行 `npx openspec validate --specs`（目前只有 `npm test`）。
+- `concurrency` 由固定的 `pages` 改為 `${{ github.workflow }}-${{ github.ref }}`。
+  原本所有 ref 共用一組且 `cancel-in-progress: true`，PR 的 run 會取消掉
+  正在進行的 main 部署。這是加上 `pull_request` trigger 後才會浮現的問題。
+- `pages: write` / `id-token: write` 由 workflow 層下移到 `deploy` job，
+  PR 的 run 不再持有部署權限。
 
 **為什麼值得做**：把 review 從「這東西會不會動」變成「這個判斷對不對」——後者才需要人。而且沒有 PR gate 就無法在手機上 review，因為無從確認它能跑。這同時是 agent 開 PR 流程的前置。
+
+**`openspec validate --specs` 決定不放進 CI**（2026-08-29）：`openspec` 是全域安裝的
+CLI（`~/.nvm/.../bin/openspec` 1.5.0），不在 `package.json` 裡。要放進 CI 只有兩條路：
+用未鎖版本的 `npx openspec`（每次 run 都上網抓、版本會漂），或新增一個 devDependency。
+而它能擋的是 spec 檔的結構錯誤——只有在有人編輯 spec 時才可能發生，
+而那個人本來就能在本機跑一次。為了低頻率、低嚴重度的檢查，在每次 CI 加上
+一個未鎖版本的網路相依，不符合「界線內＝一次做完就結束」。
+日後若 openspec 成為專案相依套件，再加不遲。
 
 後續（同屬界線內，但可分開）：`backend/package.json` 補 test script、Firestore / Mongo 兩個 repository 實作補測試（目前零覆蓋）。#14 訓練筆記要動 backend schema，會直接受惠。
 
@@ -709,7 +723,7 @@ Firebase Console → Firestore → 規則。**如果還停在建立專案時的 
 1. ~~**#15** 修正當週平均體重趨勢顯示~~ ✅ 完成（2026-08-23）
 2. ~~**#11** 記住上次選的動作~~ ✅ 完成（2026-08-23）
 3. **#17** 確認並鎖上 Firestore 安全規則（可能現在就是敞開的，先查 console 再說）← **下一步**
-4. **#4 (a)** 修掉 feature branch 部署到正式站，順手補上 PR gate（一個檔案、二十行；也是 agent 化的前置）
+4. ~~**#4 (a)** 修掉 feature branch 部署到正式站 + PR gate~~ ✅ 完成（2026-08-29）
 5. **#12 (a)(b)** 選單改從 sessions 推導 + `constants.js` 改名（純前端、無風險，做完就不會再產生新的名稱分岔）
 6. **#2 + #13** 動作變化通知與動作注意事項提示（主菜；先走 brainstorming 把 #2 的規則問題定案，兩者的提示 UI 一起設計）
 7. **#12 (c)** 44 筆資料清理（動到正式資料，單獨處理，建議排在 #2/#13 開工前完成）
