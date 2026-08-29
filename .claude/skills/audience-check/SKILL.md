@@ -96,16 +96,23 @@ SHALL NOT 作為說服自己或作者的理由。它們只產生一筆紀錄。
 
 ## 答案記在哪裡
 
-記錄是這個 skill 的產出，光問完就散掉等於沒做。依改動規模對應：
+記錄是這個 skill 的產出，光問完就散掉等於沒做。**記兩個地方**：
 
-| 改動類型 | 記錄位置 |
+| 位置 | 內容 |
 |---|---|
-| architectural（有 design doc） | `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` 開頭，獨立一節「受眾檢查」 |
-| bounded（無 design doc） | `todo_feature_202608.md` 對應項目底下加一行 `**受眾**：…` |
-| 沒有對應 todo 項目的小改動 | commit message 或 PR 描述中一行帶過 |
-| spike | 不記錄——spike 的產出是答案，不是功能 |
+| `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` | 獨立一節「受眾檢查」，完整答案與理由 |
+| `todo_feature_202608.md` 對應項目 | 一行精簡標籤，供整份掃描 |
 
-在 `todo_feature_202608.md` 的項目中，用一行精簡格式即可：
+兩個都要：design doc 有脈絡但分散在許多檔案，todo 的一行標籤才能一次掃完、
+形成下方所說的「通用性地圖」。
+
+自 2026-08-29 起**所有需求一律產出 design doc**（不再區分 bounded／architectural），
+所以第一欄永遠存在。若該需求沒有對應的 todo 項目，SHALL 補一個——
+可直接標為已完成；地圖需要密度才有價值。
+
+**spike 不記錄**——spike 的產出是答案，不是功能。
+
+todo 項目中用一行精簡格式即可：
 
 ```
 **受眾**：用出來的｜僅我｜進階者：是｜一般：推測會（驗證：給訓練同伴用一週）｜對我變差：否
