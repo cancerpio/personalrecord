@@ -271,6 +271,14 @@ const chartSeries = computed(() => {
 // 替他清掉屬於「系統做了他沒要求的決定」。若該組合無資料，
 // 圖表既有的空狀態會顯示出來——失敗是可見的，不是靜默的。
 const chartSectionRef = ref(null);
+const overviewSectionRef = ref(null);
+
+// 回程。點列會把使用者帶離表格，而 Dashboard 很長，手動捲回去是實質成本。
+// 常駐顯示而非只在「點列進來」時出現：做成條件顯示要多一個狀態，
+// 而這個按鈕本身沒有害處——不管怎麼捲下來的，回列表都是合理的動作。
+function backToOverview() {
+    overviewSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 function focusExercise(exerciseName) {
   filters.value = { ...filters.value, exercise: exerciseName };
@@ -340,12 +348,17 @@ onMounted(() => {
     </div>
 
     <!-- 最近動作總覽：與容積、體重同屬「這週該知道的事」，放在頂部摘要區 -->
-    <ExerciseOverview :rows="exerciseOverview" @select="focusExercise" />
+    <div ref="overviewSectionRef">
+      <ExerciseOverview :rows="exerciseOverview" @select="focusExercise" />
+    </div>
 
     <!-- Chart Section 1: Absolute Strength & Bodyweight -->
     <div ref="chartSectionRef" class="chart-section" :class="{ loading: loading }">
       <div class="section-header">
-        <h2>Performance Overview</h2>
+        <div class="section-header-row">
+          <h2>Performance Overview</h2>
+          <button type="button" class="back-to-list" @click="backToOverview">↑ 回到動作列表</button>
+        </div>
         <p class="section-desc">左軸代表訓練重量 (KG)，右側虛線代表體脂率 (%)，協助分析體態變化對力量的影響。</p>
       </div>
       <div v-if="chartSeries.length > 0" class="chart-container glass-panel">
@@ -525,6 +538,31 @@ onMounted(() => {
 .chart-section.loading {
   opacity: 0.5;
   pointer-events: none;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 這裡用方向箭頭不違反「不使用警報語彙」——差別在於它真的可點、真的有行為。
+   舊 Sparkline 的問題是外觀像可操作元件卻不可點，屬假的暗示。 */
+.back-to-list {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.back-to-list:active {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .section-header h2 {
