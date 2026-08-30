@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import HistoryChart from '../components/HistoryChart.vue';
 import FilterControls from '../components/FilterControls.vue';
-import SparklineRow from '../components/SparklineRow.vue';
 import ExerciseOverview from '../components/ExerciseOverview.vue';
 import { useSessionStore } from '../stores/sessionStore.js';
 import { signed } from '../utils/format.js';
@@ -266,73 +265,19 @@ const chartSeries = computed(() => {
 });
 
 // Sparklines array for the top header
-const sparklines = computed(() => {
-  // Force Vue reactivity to register these dependencies before mapping
-  const currentRmType = filters.value.rmType;
-  const currentYear = filters.value.year;
-  const currentMonth = filters.value.month;
-  
-  // We only show up to 3 sparklines on the dashboard to keep it clean (MVP Apple HIG)
-  const topExercises = uniqueExercises.value.slice(0, 3);
-  
-  if (topExercises.length === 0) return [];
 
-  return topExercises.map(ex => {
-    // Pass the destructured reactive values, not filters.value.*
-    const data = sessionStore.getChartSeriesForExercise(ex, currentRmType, currentYear, currentMonth);
-    const yValues = data.map(d => d[1]);
-    
-    // Default values for short data
-    let trend = 'none';
-    let label = '—';
-    
-    if (yValues.length >= 2) {
-      // Determine the current trend direction based on the last two points
-      const lastPoint = yValues[yValues.length - 1];
-      const prevPoint = yValues[yValues.length - 2];
-      
-      let currentTrendDirection = 'same';
-      if (lastPoint > prevPoint) currentTrendDirection = 'up';
-      if (lastPoint < prevPoint) currentTrendDirection = 'down';
+// 點動作總覽的某一列 → 把主圖切到該動作並捲過去。
+// 刻意只設定 exercise，不動 rmType / year / month：使用者若設過篩選那是刻意的，
+// 替他清掉屬於「系統做了他沒要求的決定」。若該組合無資料，
+// 圖表既有的空狀態會顯示出來——失敗是可見的，不是靜默的。
+const chartSectionRef = ref(null);
 
-      // Count consecutive days of this trend
-      let streakCount = 1; // Including the last point
-      for (let i = yValues.length - 2; i >= 0; i--) {
-        const p1 = yValues[i + 1];
-        const p0 = yValues[i];
-        
-        let pointTrend = 'same';
-        if (p1 > p0) pointTrend = 'up';
-        if (p1 < p0) pointTrend = 'down';
-
-        if (pointTrend === currentTrendDirection) {
-          streakCount++;
-        } else {
-          break; // Streak broken
-        }
-      }
-
-      trend = currentTrendDirection;
-      
-      if (trend === 'up') {
-        label = `連續 ${streakCount} 天上升`;
-      } else if (trend === 'down') {
-        label = `連續 ${streakCount} 天下降`;
-      } else {
-        label = `連續 ${streakCount} 天停滯`;
-      }
-    }
-
-    return {
-      id: ex.toLowerCase().replace(' ', '-'),
-      label: ex,
-      value: yValues.length > 0 ? `${yValues[yValues.length - 1]}kg` : '—',
-      trend: trend,
-      statusLabel: label,
-      data: yValues
-    };
+function focusExercise(exerciseName) {
+  filters.value = { ...filters.value, exercise: exerciseName };
+  nextTick(() => {
+    chartSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-});
+}
 
 onMounted(() => {
   if (sessionStore.sessions.length === 0) {
@@ -395,19 +340,10 @@ onMounted(() => {
     </div>
 
     <!-- 最近動作總覽：與容積、體重同屬「這週該知道的事」，放在頂部摘要區 -->
-    <ExerciseOverview :rows="exerciseOverview" />
-
-    <!-- Sparklines (Performance Trends) -->
-    <div class="sparklines-container" :class="{ refreshing: loading }">
-      <SparklineRow 
-        v-for="item in sparklines" 
-        :key="item.id" 
-        :data="item" 
-      />
-    </div>
+    <ExerciseOverview :rows="exerciseOverview" @select="focusExercise" />
 
     <!-- Chart Section 1: Absolute Strength & Bodyweight -->
-    <div class="chart-section" :class="{ loading: loading }">
+    <div ref="chartSectionRef" class="chart-section" :class="{ loading: loading }">
       <div class="section-header">
         <h2>Performance Overview</h2>
         <p class="section-desc">左軸代表訓練重量 (KG)，右側虛線代表體脂率 (%)，協助分析體態變化對力量的影響。</p>
@@ -577,19 +513,6 @@ onMounted(() => {
 .history-average {
   font-size: 12px;
   color: var(--text-secondary);
-}
-
-.sparklines-container {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: opacity 0.3s ease;
-}
-
-.sparklines-container.refreshing {
-  opacity: 0.6;
-  pointer-events: none;
 }
 
 .chart-section {
