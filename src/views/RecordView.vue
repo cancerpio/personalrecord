@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import SearchableDropdown from '../components/SearchableDropdown.vue';
 import { BASE_EXERCISES } from '../constants.js';
@@ -9,29 +9,32 @@ import { todayLocalISO } from '../utils/date.js';
 const router = useRouter();
 const sessionStore = useSessionStore();
 
+// 整頁共用一個日期：這一頁的心智模型是「正在編輯某一天」。
+// 體重與訓練原本各有一個 date 欄位，切換其中一個時另一個不動，
+// 造成上半部顯示某天、下半部仍停在另一天。
+const selectedDate = ref(todayLocalISO());
+
 const form = reactive({
-  date: todayLocalISO(),
   exercise: '',
   weight: '',
   reps: ''
 });
 
 const fatForm = reactive({
-  date: todayLocalISO(),
   fatPercentage: '',
   bodyWeight: ''
 });
 
 const canSubmit = computed(() => {
-  return form.date && form.exercise && form.weight && form.reps;
+  return selectedDate.value && form.exercise && form.weight && form.reps;
 });
 
 const canSubmitFat = computed(() => {
-  return fatForm.date && (fatForm.fatPercentage || fatForm.bodyWeight);
+  return selectedDate.value && (fatForm.fatPercentage || fatForm.bodyWeight);
 });
 
 const currentFatRecord = computed(() => {
-  return sessionStore.bodyMetrics.find(item => item.date === fatForm.date);
+  return sessionStore.bodyMetrics.find(item => item.date === selectedDate.value);
 });
 
 watch(currentFatRecord, (newRecord) => {
@@ -81,7 +84,7 @@ const submitLog = async () => {
   if (!canSubmit.value) return;
   
   const newRecord = {
-    date: form.date,
+    date: selectedDate.value,
     exercise: form.exercise,
     weight: Number(form.weight),
     reps: Number(form.reps)
@@ -112,7 +115,7 @@ const submitFatLog = async () => {
   if (!canSubmitFat.value) return;
   
   const newRecord = {
-    date: fatForm.date
+    date: selectedDate.value
   };
 
   if (fatForm.fatPercentage !== '') {
@@ -168,7 +171,7 @@ const groupedSessions = computed(() => {
   
   // Group by Date + Exercise, but ONLY for the currently selected date
   sessionsArray
-    .filter(session => session && session.date === form.date && session.exercise)
+    .filter(session => session && session.date === selectedDate.value && session.exercise)
     .forEach(session => {
       // Create a normalized Date key
       const dateKey = session.date;
@@ -203,15 +206,18 @@ const groupedSessions = computed(() => {
         <h1>Daily Log Hub</h1>
       </div>
     </div>
+
+    <!-- 單一日期控制項：體重、訓練表單與已存紀錄三塊都跟著它走。 -->
+    <div class="ios-list-group glass-card date-group">
+      <div class="ios-list-item">
+        <label>Date</label>
+        <input type="date" class="ios-input" v-model="selectedDate" />
+      </div>
+    </div>
     
     <h3 class="section-title">Body Metrics</h3>
     <!-- iOS 16 Grouped List Form (Fat) -->
     <div class="ios-list-group glass-card">
-      <div class="ios-list-item">
-        <label>Date</label>
-        <input type="date" class="ios-input" v-model="fatForm.date" />
-      </div>
-
       <div class="ios-list-item">
         <label>Body Weight <span class="unit">(KG)</span></label>
         <input type="number" inputmode="decimal" class="ios-input num-input" v-model="fatForm.bodyWeight" placeholder="0.0" />
@@ -245,11 +251,6 @@ const groupedSessions = computed(() => {
     <h3 class="section-title">Training</h3>
     <!-- iOS 16 Grouped List Form (Training) -->
     <div class="ios-list-group glass-card">
-      <div class="ios-list-item">
-        <label>Date</label>
-        <input type="date" class="ios-input" v-model="form.date" />
-      </div>
-
       <div class="ios-list-item">
         <label>Exercise</label>
         <div class="ios-input-wrapper">
@@ -308,6 +309,10 @@ const groupedSessions = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.date-group {
+  margin-bottom: 12px;
 }
 
 .header-section {

@@ -6,6 +6,9 @@ exercise, so the user only needs to adjust the numbers instead of retyping them 
 It also preselects the most recently logged exercise on first load, so opening the form already
 shows the user's last set.
 
+本能力同時規範記錄頁的**日期範圍**——該頁的心智模型是「正在編輯某一天」，
+日期的變更會連帶影響帶入行為，兩者無法分開描述。
+
 ## Requirements
 
 ### Requirement: Prefill Last Set On Exercise Selection
@@ -76,6 +79,49 @@ shows the user's last set.
 #### Scenario: 預選動作會連帶觸發帶入
 - **WHEN** 初次載入時系統依「Preselect Last Logged Exercise On First Load」把動作填入表單
 - **THEN** 帶入行為 SHALL 被觸發，重量與次數 SHALL 為該動作最後一組的數值
+
+### Requirement: Single Date Scope
+記錄頁 SHALL 只有一個日期控制項。其值 SHALL 同時決定三件事：體重／體脂表單所編輯的日期、
+訓練表單所記錄的日期，以及頁面下方「已存紀錄」所顯示的日期。
+SHALL NOT 提供多個各自獨立的日期欄位。
+
+變更該日期時：
+- 重量與次數欄位 SHALL 維持不變（見 Prefill Triggers Only On Exercise Change）。
+- 體重與體脂欄位 SHALL 更新為該日期已存的紀錄；該日期沒有紀錄時 SHALL 清空。
+
+已知取捨（記錄既定行為，非正規需求）：若使用者在體重／體脂欄位輸入了尚未儲存的數值後
+變更日期，該輸入會被覆寫或清空，且 SHALL NOT 另行提示。這是刻意選擇——本頁的模型是
+「正在編輯某一天」，日期由使用者主動變更，欄位變化當場可見，且**不會產生錯誤資料**，
+只會遺失可重打的輸入。
+
+曾評估兩個替代方案並否決：
+- 「欄位被改過就不自動帶入」會讓欄位顯示今天的數值、按鈕卻是 Update，
+  按下去等於把今天的體重存進另一天——從遺失輸入惡化為產生錯誤資料。
+- 「偵測未存修改並跳出確認」需要在 `RecordView` 加入有狀態的邏輯（dirty 判定、
+  取消後還原日期、避免 watcher 遞迴），而該元件目前無任何自動化測試覆蓋（見 todo #10）。
+  風險大於其所防止的損失。
+
+日後若實際使用上反覆造成困擾，應重新評估確認提示方案，並以元件測試覆蓋。
+
+#### Scenario: 變更日期時三個區塊同時更新
+- **WHEN** 使用者變更頁面上唯一的日期控制項
+- **THEN** 體重／體脂表單、訓練表單所記錄的日期、以及已存紀錄清單 SHALL 全部切換至該日期
+
+#### Scenario: 變更日期時載入該日的體重紀錄
+- **WHEN** 使用者將日期切換至一個已有體重紀錄的日期
+- **THEN** 體重與體脂欄位 SHALL 顯示該日期的已存數值
+
+#### Scenario: 該日期無體重紀錄時清空欄位
+- **WHEN** 使用者將日期切換至一個沒有體重紀錄的日期
+- **THEN** 體重與體脂欄位 SHALL 被清空
+
+#### Scenario: 未儲存的體重輸入在變更日期時被捨棄
+- **WHEN** 使用者於體重欄位輸入數值但尚未儲存，接著變更日期
+- **THEN** 該輸入 SHALL 被該日期的紀錄覆寫或清空，SHALL NOT 出現確認提示
+
+#### Scenario: 變更日期不影響訓練表單的重量與次數
+- **WHEN** 使用者在已填妥重量與次數的狀態下變更日期
+- **THEN** 重量與次數欄位 SHALL 維持不變
 
 ### Requirement: Preselect Last Logged Exercise On First Load
 記錄表單初次載入時，若使用者尚未選定動作且已存在訓練紀錄，系統 SHALL 將「最近一筆訓練紀錄的動作名稱」填入所選動作欄位。「最近一筆」SHALL 依「Determine The Last Set」完全相同的排序規則判定，使預選的動作與帶入的組數必定來自同一筆紀錄。
