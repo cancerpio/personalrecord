@@ -13,13 +13,25 @@ function levelOf(weeks) {
   if (weeks >= 3) return 'warning';
   return '';
 }
+
+// 最近 14 天的組數與次數合併成一欄，避免手機上欄位過多。
+// 該視窗內完全沒練時顯示破折號，與「0 組 0 次」區隔——
+// 前者是「這段期間沒碰」，後者會讓人以為練了但沒記到數字。
+function recentText(row) {
+  if (!row.recentSets) return '—';
+  return `${row.recentSets}組·${row.recentReps}次`;
+}
+
+function maxWeightText(row) {
+  return row.maxWeight === null || row.maxWeight === undefined ? '—' : row.maxWeight;
+}
 </script>
 
 <template>
   <div class="streak-section">
     <div class="streak-header">
-      <h2>最近動作連續週數</h2>
-      <p class="streak-desc">同一動作目前連續幾週沒換過，最多列出最近練到的 12 個動作。數字越大代表該受力結構被連續使用越久，可考慮安排變化動作；歸零代表已中斷。</p>
+      <h2>最近動作總覽</h2>
+      <p class="streak-desc">同一動作目前連續幾週沒換過，以及最近 14 天做了多少。最多列出最近練到的 12 個動作。連續週數歸零代表已中斷。</p>
     </div>
 
     <div class="streak-panel glass-panel">
@@ -30,13 +42,15 @@ function levelOf(weeks) {
       <template v-else>
         <div class="streak-row streak-row--head">
           <span class="col-exercise">動作</span>
-          <span class="col-weeks">連續週數</span>
-          <span class="col-date">最後練到</span>
+          <span class="col-recent">最近14天</span>
+          <span class="col-max">最重</span>
+          <span class="col-weeks">連續</span>
         </div>
         <div v-for="row in rows" :key="row.exercise" class="streak-row">
           <span class="col-exercise">{{ row.exercise }}</span>
+          <span class="col-recent">{{ recentText(row) }}</span>
+          <span class="col-max">{{ maxWeightText(row) }}</span>
           <span class="col-weeks" :class="levelOf(row.streakWeeks)">{{ row.streakWeeks }}</span>
-          <span class="col-date">{{ row.lastDate }}</span>
         </div>
       </template>
     </div>
@@ -64,9 +78,9 @@ function levelOf(weeks) {
 
 .streak-row {
   display: grid;
-  grid-template-columns: 1fr auto 92px;
+  grid-template-columns: minmax(0, 1fr) auto 52px 34px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   height: 30px;
   border-bottom: 1px solid var(--separator-color);
 }
@@ -83,12 +97,26 @@ function levelOf(weeks) {
   white-space: nowrap;
 }
 
+.col-recent {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.col-max {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-primary);
+}
+
 .col-weeks {
   font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  min-width: 32px;
   color: var(--text-primary);
 }
 
@@ -96,16 +124,10 @@ function levelOf(weeks) {
 .col-weeks.critical { color: var(--danger-color); }
 .col-weeks.warning { color: #FF9500; }
 
-.col-date {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--text-secondary);
-}
-
 .streak-row--head .col-exercise,
-.streak-row--head .col-weeks,
-.streak-row--head .col-date {
+.streak-row--head .col-recent,
+.streak-row--head .col-max,
+.streak-row--head .col-weeks {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;

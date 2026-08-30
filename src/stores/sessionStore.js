@@ -23,6 +23,17 @@ function shiftWeeks(mondayStr, deltaWeeks) {
     return `${dt.getUTCFullYear()}-${mm}-${dd}`;
 }
 
+// 以天為單位平移一個「YYYY-MM-DD」字串。與 shiftWeeks 同基準：
+// 拿到的已是日期字串，Date.UTC 在此是純日曆運算、不涉及時區。
+function shiftDays(dateStr, deltaDays) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + deltaDays);
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    return `${dt.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 // 連續週數：自錨點那一週往回逐週檢查。
 // 「該週有練」計入並把連續未命中歸零；「該週沒練」則未命中 +1，
 // 連續未命中超過 MAX_GAP_WEEKS 即停止。
@@ -170,40 +181,78 @@ export const useSessionStore = defineStore('session', {
             return best ? (best.exercise || null) : null;
         },
 
-        // 每個動作「目前連續幾週沒換過」，供 Dashboard 的最近動作連續週數總覽顯示。
-        // 產品意圖是結構性負荷輪替（同一受力結構被連續使用多久），不是偵測停滯，
-        // 因此不看重量變化——重量在漲反而讓關節承受的絕對負荷更大。
+        // 每個動作的近況總覽，供 Dashboard 的「最近動作總覽」顯示。
+        // 一列同時回答三個問題：目前連續幾週沒換過、最近兩週做了多少、歷來最重多少。
         //
-        // 錨點是「當週」而非該動作最後練到的那一週：要回答的是「現在還持續著嗎」，
-        // 不是「歷史上曾經連續過幾週」。停練超過容許空窗後歸零，
-        // 但該動作仍會列出（連續週數 0），讓最近練了什麼一眼看完。
+        // 連續週數的產品意圖是結構性負荷輪替（同一受力結構被連續使用多久），
+        // 不是偵測停滯，因此不看重量變化——重量在漲反而讓關節承受的絕對負荷更大。
+        // 錨點是「當週」而非該動作最後練到的那一週：要回答的是「現在還持續著嗎」。
+        // 停練超過容許空窗後歸零，但該動作仍會列出，讓最近練了什麼一眼看完。
+        //
+        // 兩套時間範圍刻意不同，因為它們回答的問題不同：
+        //   連續週數走週界（週一起算），回答「這一週有沒有練到」；
+        //   組數與總次數走滾動 14 天，回答「最近兩週累積了多少」。
+        // 最大重量則不受任何視窗限制——它問的是「這個動作我碰過最重多少」。
+        //
+        // 注意「最大重量」與圖表的 `PR` 不是同一件事：getChartSeriesForExercise 的
+        // PR 是嚴格 1RM（reps === 1）；這裡是不限 reps 的最大重量。兩者刻意分開命名。
         //
         // 刻意不做動作名稱別名合併：Overhead Press 與 Barbell Overhead Press
         // 會分成兩行，讓名稱分岔問題直接顯示在畫面上，而不是靜靜地壞在背後。
-        exerciseStreaks: (state) => {
+        exerciseOverview: (state) => {
             const MAX_ROWS = 12;
+            // 「最近」＝含今天在內往回 14 天。
+            const RECENT_WINDOW_DAYS = 14;
 
-            // 依動作彙整「有練到的週」與「實際最後訓練日」
+            const todayStr = todayLocalISO();
+            const currentMonday = getMondayOfDate(todayStr);
+            const recentStart = shiftDays(todayStr, -(RECENT_WINDOW_DAYS - 1));
+
             const byExercise = {};
             state.sessions.forEach(session => {
                 if (!session || !session.date || !session.exercise) return;
                 let entry = byExercise[session.exercise];
                 if (!entry) {
-                    entry = byExercise[session.exercise] = { weeks: new Set(), lastDate: session.date };
+                    entry = byExercise[session.exercise] = {
+                        weeks: new Set(),
+                        lastDate: session.date,
+                        recentSets: 0,
+                        recentReps: 0,
+                        maxWeight: null,
+                    };
                 }
                 entry.weeks.add(getMondayOfDate(session.date));
                 if (session.date > entry.lastDate) entry.lastDate = session.date;
-            });
 
-            const todayStr = todayLocalISO();
-            const currentMonday = getMondayOfDate(todayStr);
+                // 最大重量掃全部歷史。缺 weight 或非數字者略過，
+                // 完全沒有有效重量時維持 null，由畫面顯示為「—」。
+                const weight = Number(session.weight);
+                const hasWeight = session.weight !== undefined
+                    && session.weight !== null
+                    && session.weight !== ''
+                    && !Number.isNaN(weight);
+                if (hasWeight && (entry.maxWeight === null || weight > entry.maxWeight)) {
+                    entry.maxWeight = weight;
+                }
+
+                // 組數與總次數只看視窗內。一筆紀錄＝一組。
+                // reps 缺失或非數字以 0 計入，避免總和變成 NaN 汙染整欄。
+                if (session.date >= recentStart) {
+                    entry.recentSets += 1;
+                    const reps = Number(session.reps);
+                    entry.recentReps += Number.isNaN(reps) ? 0 : reps;
+                }
+            });
 
             return Object.keys(byExercise)
                 .map(exercise => {
-                    const { weeks, lastDate } = byExercise[exercise];
+                    const { weeks, lastDate, recentSets, recentReps, maxWeight } = byExercise[exercise];
                     return {
                         exercise,
                         streakWeeks: computeStreakWeeks(weeks, currentMonday),
+                        recentSets,
+                        recentReps,
+                        maxWeight,
                         lastDate,
                     };
                 })
