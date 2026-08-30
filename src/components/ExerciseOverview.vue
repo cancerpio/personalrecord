@@ -6,6 +6,10 @@ defineProps({
   }
 });
 
+// 點一列＝把底下的 Performance Overview 圖表切到該動作。
+// 這裡只發事件、不碰路由或篩選狀態，維持本元件為純表現層。
+const emit = defineEmits(['select']);
+
 // 顏色分段。這是視覺分段，不是警報門檻——本功能刻意不通知，
 // 因此門檻調整只影響好不好看，改動成本趨近於零。
 function levelOf(weeks) {
@@ -46,7 +50,12 @@ function maxWeightText(row) {
           <span class="col-max">最重</span>
           <span class="col-weeks">連續</span>
         </div>
-        <div v-for="row in rows" :key="row.exercise" class="streak-row">
+        <div
+          v-for="row in rows"
+          :key="row.exercise"
+          class="streak-row streak-row--clickable"
+          @click="emit('select', row.exercise)"
+        >
           <span class="col-exercise">{{ row.exercise }}</span>
           <span class="col-recent">{{ recentText(row) }}</span>
           <span class="col-max">{{ maxWeightText(row) }}</span>
@@ -87,6 +96,17 @@ function maxWeightText(row) {
 
 .streak-row:last-child {
   border-bottom: none;
+}
+
+/* 可點擊的提示只用游標與按下態。刻意不加箭頭或 icon——
+   本區塊不通知也不警示，加上指示符號會回到舊 Sparkline 那種
+   「有暗示卻沒有對應語意」的問題（見 Presentation Without Alerting）。 */
+.streak-row--clickable {
+  cursor: pointer;
+}
+
+.streak-row--clickable:active {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .col-exercise {
