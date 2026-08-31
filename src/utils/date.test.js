@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { todayLocalISO } from './date.js';
+import { todayLocalISO, shiftDays } from './date.js';
 
 // 這些測試依賴時區為 Asia/Taipei（UTC+8），由 vitest.config.js 釘住。
 describe('todayLocalISO', () => {
@@ -31,5 +31,38 @@ describe('todayLocalISO', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-25T16:30:00Z'));
     expect(todayLocalISO()).toBe('2026-08-26');
+  });
+});
+
+describe('shiftDays', () => {
+  it('往前後平移天數', () => {
+    expect(shiftDays('2026-08-31', -1)).toBe('2026-08-30');
+    expect(shiftDays('2026-08-30', 1)).toBe('2026-08-31');
+    expect(shiftDays('2026-08-30', 0)).toBe('2026-08-30');
+  });
+
+  it('跨月邊界', () => {
+    expect(shiftDays('2026-09-01', -1)).toBe('2026-08-31');
+    expect(shiftDays('2026-08-31', 1)).toBe('2026-09-01');
+  });
+
+  it('跨年邊界', () => {
+    expect(shiftDays('2026-01-01', -1)).toBe('2025-12-31');
+    expect(shiftDays('2025-12-31', 1)).toBe('2026-01-01');
+  });
+
+  it('閏年二月', () => {
+    expect(shiftDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(shiftDays('2028-03-01', -1)).toBe('2028-02-29');
+    expect(shiftDays('2026-02-28', 1)).toBe('2026-03-01'); // 2026 非閏年
+  });
+
+  it('月與日補零成兩位數', () => {
+    expect(shiftDays('2026-01-10', -1)).toBe('2026-01-09');
+  });
+
+  it('是純日曆運算，不受執行環境時區影響', () => {
+    // 輸入已是日期字串、不涉及時刻，因此結果與時區無關
+    expect(shiftDays('2026-08-30', -7)).toBe('2026-08-23');
   });
 });

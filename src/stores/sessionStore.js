@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { api } from '../services/api';
-import { todayLocalISO } from '../utils/date.js';
+import { todayLocalISO, shiftDays } from '../utils/date.js';
 
 function getMondayOfDate(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -18,17 +18,6 @@ function shiftWeeks(mondayStr, deltaWeeks) {
     const [y, m, d] = mondayStr.split('-').map(Number);
     const dt = new Date(Date.UTC(y, m - 1, d));
     dt.setUTCDate(dt.getUTCDate() + deltaWeeks * 7);
-    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getUTCDate()).padStart(2, '0');
-    return `${dt.getUTCFullYear()}-${mm}-${dd}`;
-}
-
-// 以天為單位平移一個「YYYY-MM-DD」字串。與 shiftWeeks 同基準：
-// 拿到的已是日期字串，Date.UTC 在此是純日曆運算、不涉及時區。
-function shiftDays(dateStr, deltaDays) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d));
-    dt.setUTCDate(dt.getUTCDate() + deltaDays);
     const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(dt.getUTCDate()).padStart(2, '0');
     return `${dt.getUTCFullYear()}-${mm}-${dd}`;
