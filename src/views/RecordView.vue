@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import SearchableDropdown from '../components/SearchableDropdown.vue';
 import { BASE_EXERCISES } from '../constants.js';
 import { useSessionStore } from '../stores/sessionStore.js';
-import { todayLocalISO } from '../utils/date.js';
+import { todayLocalISO, shiftDays } from '../utils/date.js';
 
 const router = useRouter();
 const sessionStore = useSessionStore();
@@ -13,6 +13,22 @@ const sessionStore = useSessionStore();
 // 體重與訓練原本各有一個 date 欄位，切換其中一個時另一個不動，
 // 造成上半部顯示某天、下半部仍停在另一天。
 const selectedDate = ref(todayLocalISO());
+
+// ±1 天的快速切換。實測 484 筆紀錄中補記過去者 19 筆，且**全部都是前一天**，
+// 無一超過 1 天——因此「回到昨天」是最頻繁的日期操作，值得一個 tap 就到。
+// 點日期本身仍會開啟原生選擇器，供跨度較大的跳轉使用。
+//
+// 不允許往未來走：本 app 是紀錄工具而非計畫工具，資料中未來日期為 0 筆，
+// 不擋的話連點兩下就會靜默記到明天。若日後往「預先安排課表」的方向走
+// （參考 Mohup），需要的是區分「計畫」與「已執行」，而不是單純放行未來日期。
+const canGoNextDay = computed(() => selectedDate.value < todayLocalISO());
+
+function stepDay(deltaDays) {
+    const next = shiftDays(selectedDate.value, deltaDays);
+    // 按鈕已停用，這裡再擋一次：程式或鍵盤觸發時同樣不得越過今天。
+    if (next > todayLocalISO()) return;
+    selectedDate.value = next;
+}
 
 const form = reactive({
   exercise: '',
@@ -211,7 +227,17 @@ const groupedSessions = computed(() => {
     <div class="ios-list-group glass-card date-group">
       <div class="ios-list-item">
         <label>Date</label>
-        <input type="date" class="ios-input" v-model="selectedDate" />
+        <div class="date-stepper">
+          <button type="button" class="step-btn" aria-label="前一天" @click="stepDay(-1)">‹</button>
+          <input type="date" class="ios-input" v-model="selectedDate" />
+          <button
+            type="button"
+            class="step-btn"
+            aria-label="後一天"
+            :disabled="!canGoNextDay"
+            @click="stepDay(1)"
+          >›</button>
+        </div>
       </div>
     </div>
     
@@ -313,6 +339,39 @@ const groupedSessions = computed(() => {
 
 .date-group {
   margin-bottom: 12px;
+}
+
+.date-stepper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 觸控目標 32px；箭頭視覺上刻意輕，不與日期本身爭焦點。 */
+.step-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.step-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 停用＝已經在今天。降透明度而非隱藏，讓按鈕位置固定，日期不會左右跳動。 */
+.step-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 .header-section {
