@@ -192,46 +192,32 @@ SHALL NOT 解讀為「整段期間總共只能空一週」。
 - **THEN** 該數字 SHALL 以警示色顯示，且 SHALL NOT 伴隨任何警示 icon 或通知
 
 ### Requirement: Row Selection
-每一**資料列** SHALL 可點擊。點擊時本能力 SHALL 發出「選定該動作」的訊號，
-並 SHALL NOT 自行處理導覽、篩選或任何狀態變更——本能力維持純表現層，
+每一**資料列** SHALL 可點擊。點擊時本能力 SHALL 發出「切換該動作」的訊號，
+並 SHALL NOT 自行處理導覽或任何狀態變更——本能力維持純表現層，
 後續行為由容器決定。**表頭列 SHALL NOT 可點擊。**
 
-可點擊的提示 SHALL 僅以游標與按下態表達。
-SHALL NOT 加入箭頭、icon 或其他指示符號——理由與 Presentation Without Alerting 相同：
-本區塊不通知也不警示，加上指示符號會回到「有視覺暗示卻無對應語意」的問題。
+容器收到訊號時 SHALL 於該列下方展開該動作的詳細面板（見 `exercise-detail-panel`），
+SHALL NOT 捲動至頁面其他位置。因為不發生捲動，本能力 SHALL NOT 需要提供
+「返回列表」的路徑——沒有東西把使用者帶離列表。
 
-容器（Dashboard）收到選定訊號時 SHALL 將該動作套用至 Performance Overview 圖表
-並捲動至該區塊，且 SHALL NOT 一併變更既有的 RM 類型與年月篩選——
-使用者若設定過篩選那是刻意的，代為清除屬於「系統做了使用者沒要求的決定」。
-若該動作在目前篩選範圍內無資料，圖表 SHALL 顯示既有的空狀態；
-此失敗 SHALL 為可見的，SHALL NOT 靜默發生。
+展開中的列 SHALL 以展開／收合指示符號標示其狀態。此處使用指示符號
+**不違反** Presentation Without Alerting：該原則禁止的是「外觀像可操作元件卻不可點」
+的假暗示，而此符號對應一個真實存在、可雙向操作的行為。
 
-容器 SHALL 同時提供**返回本列表**的方式。選定動作會將使用者捲離列表，
-而該捲動是由選取行為引入的，因此返回路徑屬於本需求的一部分，
-SHALL NOT 只提供單向的前往。
+本能力 SHALL NOT 使用 pill、emoji 或警示 icon 表達選取狀態——
+展開狀態不是警報，其顯著性由指示符號與展開的內容本身承擔。
 
-本能力 SHALL NOT 在列表中標示「目前選取」的列——圖表區塊為常駐顯示、
-永遠反映某一個動作，選取不構成一種可退出的模式，標示反而會暗示存在模式。
-
-#### Scenario: 點擊資料列選定該動作
-- **WHEN** 使用者點擊某一資料列
-- **THEN** 系統 SHALL 將 Performance Overview 圖表切換至該動作並捲動至該區塊
+#### Scenario: 點擊資料列展開詳細面板
+- **WHEN** 使用者點擊某一收合中的資料列
+- **THEN** 該動作的詳細面板 SHALL 展開於該列下方，畫面 SHALL NOT 捲動至其他區塊
 
 #### Scenario: 表頭不可點擊
 - **WHEN** 使用者點擊表頭列
 - **THEN** SHALL 無任何作用
 
-#### Scenario: 選定動作不影響既有篩選
-- **WHEN** 使用者已將篩選設為特定 RM 類型與年月，接著點擊某一資料列
-- **THEN** RM 類型與年月 SHALL 維持不變，僅動作被切換
-
-#### Scenario: 可從圖表返回動作列表
-- **WHEN** 使用者在圖表區塊選擇返回
-- **THEN** 畫面 SHALL 捲回動作總覽列表
-
-#### Scenario: 所選動作在篩選範圍內無資料
-- **WHEN** 所點動作在目前的年月篩選範圍內沒有紀錄
-- **THEN** 圖表 SHALL 顯示空狀態說明，SHALL NOT 靜默呈現空白
+#### Scenario: 展開狀態有明確指示
+- **WHEN** 某一列的詳細面板為展開狀態
+- **THEN** 該列 SHALL 顯示對應的展開指示符號，收合時 SHALL 顯示收合指示符號
 
 ### Requirement: No Exercise Name Aliasing
 本能力 SHALL 依 `exercise` 欄位的字串原樣分組，SHALL NOT 合併語意相同但字串不同的動作名稱。

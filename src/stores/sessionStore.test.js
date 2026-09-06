@@ -680,3 +680,188 @@ describe('exerciseOverview — 最近動作總覽', () => {
     expect(row.recentReps).toBe(5);
   });
 });
+
+describe('getExerciseRecords — 單一動作的 1RM/3RM/5RM 紀錄（#26）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  // reps 用數字，與 getChartSeriesForExercise 的嚴格比對一致。
+  const s = (date, weight, reps, exercise = 'Squat') =>
+    ({ id: `${exercise}-${date}-${weight}x${reps}`, date, exercise, weight, reps });
+
+  it('三個 RM 各取該 reps 的最大重量', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-05-14', 140, 1),
+      s('2026-05-14', 120, 3),
+      s('2026-05-14', 100, 5),
+      s('2026-05-14', 130, 1),
+    ];
+    const r = store.getExerciseRecords('Squat');
+    expect(r[1].weight).toBe(140);
+    expect(r[3].weight).toBe(120);
+    expect(r[5].weight).toBe(100);
+  });
+
+  it('嚴格 reps 相等，不是「至少 N 下」', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 100, 2), s('2026-05-14', 95, 3)];
+    expect(store.getExerciseRecords('Squat')[3].weight).toBe(95);
+  });
+
+  it('日期為首次達成該重量的日期，不是最近一次', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-30', 140, 1),
+      s('2026-05-14', 140, 1),
+      s('2026-05-17', 140, 1),
+    ];
+    expect(store.getExerciseRecords('Squat')[1].firstDate).toBe('2026-05-14');
+  });
+
+  it('沒有符合 reps 的紀錄時為 null', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 45, 8), s('2026-05-17', 47, 8)];
+    const r = store.getExerciseRecords('Squat');
+    expect(r[1]).toBeNull();
+    expect(r[3]).toBeNull();
+    expect(r[5]).toBeNull();
+  });
+
+  it('weight 缺失、空字串或非數字的紀錄略過', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: 'a', date: '2026-05-14', exercise: 'Squat', reps: 1 },
+      { id: 'b', date: '2026-05-15', exercise: 'Squat', reps: 1, weight: '' },
+      { id: 'c', date: '2026-05-16', exercise: 'Squat', reps: 1, weight: 'abc' },
+      s('2026-05-17', 120, 1),
+    ];
+    const r = store.getExerciseRecords('Squat');
+    expect(r[1]).toEqual({ weight: 120, firstDate: '2026-05-17' });
+  });
+
+  it('只取該動作的紀錄，不跨動作合併', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 140, 1, 'Deadlift'), s('2026-05-14', 100, 1, 'Squat')];
+    expect(store.getExerciseRecords('Squat')[1].weight).toBe(100);
+  });
+
+  it('完全沒有該動作的紀錄時三個 RM 皆為 null', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 140, 1, 'Deadlift')];
+    const r = store.getExerciseRecords('Squat');
+    expect(r).toEqual({ 1: null, 3: null, 5: null });
+  });
+});
+
+describe('getExerciseRecentDetail — 近 14 天每日明細（#26）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    // 視窗 = 2026-08-12 ~ 2026-08-25（含今天在內往回 14 天）
+    vi.setSystemTime(new Date('2026-08-25T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const s = (date, weight, reps, exercise = 'Squat') =>
+    ({ id: `${exercise}-${date}-${weight}x${reps}-${Math.random()}`, date, exercise, weight, reps });
+
+  it('回傳視窗內每個訓練日的日期、組數與容積，由新到舊', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-20', 100, 5),
+      s('2026-08-24', 120, 3),
+      s('2026-08-24', 130, 1),
+    ];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.days.map(x => x.date)).toEqual(['2026-08-24', '2026-08-20']);
+    expect(d.days[0].sets).toBe(2);
+    expect(d.days[0].volume).toBe(120 * 3 + 130 * 1);
+    expect(d.days[1].volume).toBe(500);
+  });
+
+  it('同一天相同 weight+reps 的多筆合併為一組並標示筆數', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-24', 45, 8),
+      s('2026-08-24', 45, 8),
+      s('2026-08-24', 45, 8),
+      s('2026-08-24', 45, 8),
+    ];
+    const day = store.getExerciseRecentDetail('Squat').days[0];
+    expect(day.groups).toEqual([{ weight: 45, reps: 8, count: 4 }]);
+    expect(day.sets).toBe(4);
+  });
+
+  it('同日多種重量分別列出，依重量由小到大', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-24', 140, 1),
+      s('2026-08-24', 100, 5),
+      s('2026-08-24', 130, 1),
+      s('2026-08-24', 130, 1),
+      s('2026-08-24', 130, 1),
+      s('2026-08-24', 120, 3),
+    ];
+    const day = store.getExerciseRecentDetail('Squat').days[0];
+    expect(day.groups).toEqual([
+      { weight: 100, reps: 5, count: 1 },
+      { weight: 120, reps: 3, count: 1 },
+      { weight: 130, reps: 1, count: 3 },
+      { weight: 140, reps: 1, count: 1 },
+    ]);
+    expect(day.sets).toBe(6);
+  });
+
+  it('視窗含今天在內共 14 天：第 14 天算，第 15 天不算', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-08-12', 100, 5), s('2026-08-11', 100, 5)];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.days.map(x => x.date)).toEqual(['2026-08-12']);
+  });
+
+  it('reps 或 weight 缺失時以 0 計入容積，不得為 NaN', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: 'a', date: '2026-08-24', exercise: 'Squat', weight: 100, reps: 5 },
+      { id: 'b', date: '2026-08-24', exercise: 'Squat', weight: 100 },
+      { id: 'c', date: '2026-08-24', exercise: 'Squat', reps: 5 },
+    ];
+    const day = store.getExerciseRecentDetail('Squat').days[0];
+    expect(day.volume).toBe(500);
+    expect(day.sets).toBe(3);
+  });
+
+  it('視窗內無紀錄時 days 為空，並回傳最後一次訓練的完整明細', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-06-01', 50, 5),
+      s('2026-07-20', 50, 5),
+      s('2026-07-20', 50, 5),
+    ];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.days).toEqual([]);
+    expect(d.lastBefore).toEqual({
+      date: '2026-07-20',
+      sets: 2,
+      volume: 500,
+      groups: [{ weight: 50, reps: 5, count: 2 }],
+    });
+  });
+
+  it('視窗內有紀錄時 lastBefore 為 null', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-08-24', 100, 5), s('2026-06-01', 50, 5)];
+    expect(store.getExerciseRecentDetail('Squat').lastBefore).toBeNull();
+  });
+
+  it('完全沒有該動作的紀錄時 days 為空且 lastBefore 為 null', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-08-24', 100, 5, 'Deadlift')];
+    expect(store.getExerciseRecentDetail('Squat')).toEqual({ days: [], lastBefore: null });
+  });
+});

@@ -3,11 +3,21 @@ defineProps({
   rows: {
     type: Array,
     default: () => []
+  },
+  // 目前展開中的動作名稱，null 代表全部收合。
+  expandedExercise: {
+    type: String,
+    default: null
   }
 });
 
-// 點一列＝把底下的 Performance Overview 圖表切到該動作。
-// 這裡只發事件、不碰路由或篩選狀態，維持本元件為純表現層。
+// 點一列＝發出「切換該動作」的訊號。本元件維持純表現層：
+// 展開狀態由容器持有，展開的內容也由容器透過 panel slot 放進來——
+// 這裡不知道詳細面板是什麼，也不碰 store。
+//
+// 舊行為是「捲到頁面下方常駐的 Performance Overview 區塊」，而那個區塊在
+// 使用者還沒點任何東西之前，就已經佔著版面顯示一個任意挑到的動作。
+// 改成就地展開後預設全部收合，沒點就不佔空間，也就沒有「任意挑一個」的問題。
 const emit = defineEmits(['select']);
 
 // 顏色分段。這是視覺分段，不是警報門檻——本功能刻意不通知，
@@ -45,22 +55,25 @@ function maxWeightText(row) {
 
       <template v-else>
         <div class="streak-row streak-row--head">
+          <span class="col-caret"></span>
           <span class="col-exercise">動作</span>
           <span class="col-recent">最近14天</span>
           <span class="col-max">最重</span>
           <span class="col-weeks">連續</span>
         </div>
-        <div
-          v-for="row in rows"
-          :key="row.exercise"
-          class="streak-row streak-row--clickable"
-          @click="emit('select', row.exercise)"
-        >
-          <span class="col-exercise">{{ row.exercise }}</span>
-          <span class="col-recent">{{ recentText(row) }}</span>
-          <span class="col-max">{{ maxWeightText(row) }}</span>
-          <span class="col-weeks" :class="levelOf(row.streakWeeks)">{{ row.streakWeeks }}</span>
-        </div>
+        <template v-for="row in rows" :key="row.exercise">
+          <div
+            class="streak-row streak-row--clickable"
+            @click="emit('select', row.exercise)"
+          >
+            <span class="col-caret" :class="{ open: expandedExercise === row.exercise }">▸</span>
+            <span class="col-exercise">{{ row.exercise }}</span>
+            <span class="col-recent">{{ recentText(row) }}</span>
+            <span class="col-max">{{ maxWeightText(row) }}</span>
+            <span class="col-weeks" :class="levelOf(row.streakWeeks)">{{ row.streakWeeks }}</span>
+          </div>
+          <slot v-if="expandedExercise === row.exercise" name="panel" :exercise="row.exercise" />
+        </template>
       </template>
     </div>
   </div>
@@ -87,7 +100,7 @@ function maxWeightText(row) {
 
 .streak-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 52px 34px;
+  grid-template-columns: 14px minmax(0, 1fr) auto 52px 34px;
   align-items: center;
   gap: 10px;
   height: 30px;
@@ -98,15 +111,25 @@ function maxWeightText(row) {
   border-bottom: none;
 }
 
-/* 可點擊的提示只用游標與按下態。刻意不加箭頭或 icon——
-   本區塊不通知也不警示，加上指示符號會回到舊 Sparkline 那種
-   「有暗示卻沒有對應語意」的問題（見 Presentation Without Alerting）。 */
 .streak-row--clickable {
   cursor: pointer;
 }
 
 .streak-row--clickable:active {
   background: rgba(255, 255, 255, 0.06);
+}
+
+/* 三角形指示的是展開／收合狀態，語意與行為完全對應。
+   這與舊 Sparkline 的問題不同：那裡是外觀像可操作元件卻不可點（假的暗示），
+   這裡的列真的會因點擊而展開，指示符號描述的就是它實際會做的事。 */
+.col-caret {
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.col-caret.open {
+  transform: rotate(90deg);
 }
 
 .col-exercise {
