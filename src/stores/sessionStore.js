@@ -316,6 +316,27 @@ export const useSessionStore = defineStore('session', {
             return records;
         },
 
+        // Easy Max：1RM 的 90%，四捨五入至小數點一位。
+        //
+        // 這是算出來的，不是存起來的——1RM 一破紀錄它就跟著變，
+        // 因此不存在「忘了更新」這個狀態，也不需要任何同步機制。
+        //
+        // 沿用 getExerciseRecords 取 1RM，不另寫一套判定，否則兩處遲早會分岔。
+        // 這裡用一般函式而非箭頭函式，才能透過 this 取用其他 getter。
+        //
+        // 四捨五入同時解掉浮點誤差：JS 的 140 * 0.9 是 126.00000000000001。
+        //
+        // 沒有嚴格 1RM 的動作回 null，由畫面決定不顯示——不填 0 也不填破折號。
+        // 使用者十個動作裡有六個從未有過 reps=1（划船、分腿蹲、RDL、肩推、抓舉），
+        // 「這一行不存在」是常態，不該用佔位符假裝它存在。
+        getEasyMax() {
+            return (exerciseName) => {
+                const oneRepMax = this.getExerciseRecords(exerciseName)[1];
+                if (!oneRepMax) return null;
+                return Math.round(oneRepMax.weight * 0.9 * 10) / 10;
+            };
+        },
+
         // #26 動作詳細面板：該動作近 14 天的每日明細。
         // 視窗長度與 exerciseOverview 一致（含今天在內往回 14 天），
         // 否則總覽表那一列與展開後的內容會對不起來。

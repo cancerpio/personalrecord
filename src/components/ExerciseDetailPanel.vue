@@ -22,6 +22,10 @@ const RM_ROWS = [
 
 const records = computed(() => sessionStore.getExerciseRecords(props.exercise));
 
+// Easy Max 只掛在 1RM 那一列——它就是 1RM 的 90%，掛在別列沒有意義。
+// 沒有 1RM 時為 null，該處留白而不是顯示佔位符。
+const easyMax = computed(() => sessionStore.getEasyMax(props.exercise));
+
 const recordRows = computed(() =>
   RM_ROWS
     .map(row => ({ ...row, record: records.value[row.reps] }))
@@ -150,6 +154,9 @@ onMounted(() => {
             <span class="rec-label">{{ row.label }}</span>
             <span class="rec-weight">{{ row.record.weight }}</span>
             <span class="rec-date">({{ slashDate(row.record.firstDate) }})</span>
+            <span class="rec-easy">
+              <template v-if="row.reps === 1 && easyMax !== null">Easy Max {{ easyMax }}</template>
+            </span>
             <span class="rec-caret" :class="{ open: openHistoryReps === row.reps }">▸</span>
           </div>
           <div v-if="openHistoryReps === row.reps" class="history-block">
@@ -232,7 +239,7 @@ onMounted(() => {
 
 .record-row {
   display: grid;
-  grid-template-columns: 44px auto 1fr 16px;
+  grid-template-columns: 44px auto auto 1fr 16px;
   align-items: baseline;
   gap: 8px;
   height: 30px;
@@ -257,6 +264,12 @@ onMounted(() => {
 }
 
 .rec-date {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.rec-easy {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);

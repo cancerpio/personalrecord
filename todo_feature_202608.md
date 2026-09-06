@@ -1146,6 +1146,9 @@ Performance Overview 已經是單一動作的詳細趨勢圖，只是入口在�
 > 新增 capability `openspec/specs/exercise-detail-panel/spec.md`，
 > 並 MODIFY `exercise-streak-overview` 的 `Row Selection`（捲動改手風琴）。
 > **2026-09-06 已實作**：兩個 getter 走 TDD（15 個新測試），元件層待人工驗證。
+> **2026-09-06 追加調整**：Easy Max（1RM × 0.9）與總覽表欄位用語，
+> 設計文件 `docs/superpowers/specs/2026-09-06-easy-max-and-overview-wording-design.md`。
+> 表格標題未定案（「最近 2 週」與「最近 12 週」皆與實際範圍不符，理由見設計文件）。
 
 ### 起因
 

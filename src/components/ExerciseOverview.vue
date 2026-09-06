@@ -45,7 +45,7 @@ function maxWeightText(row) {
   <div class="streak-section">
     <div class="streak-header">
       <h2>最近動作總覽</h2>
-      <p class="streak-desc">同一動作目前連續幾週沒換過，以及最近 14 天做了多少。最多列出最近練到的 12 個動作。連續週數歸零代表已中斷。</p>
+      <p class="streak-desc">最近練過的 12 個動作。</p>
     </div>
 
     <div class="streak-panel glass-panel">
@@ -57,9 +57,9 @@ function maxWeightText(row) {
         <div class="streak-row streak-row--head">
           <span class="col-caret"></span>
           <span class="col-exercise">動作</span>
-          <span class="col-recent">最近14天</span>
+          <span class="col-recent">近2週</span>
           <span class="col-max">最重</span>
-          <span class="col-weeks">連續</span>
+          <span class="col-weeks">持續</span>
         </div>
         <template v-for="row in rows" :key="row.exercise">
           <div
