@@ -93,16 +93,14 @@ SHALL NOT 提供年月篩選——單一動作的訓練日數有限，篩選不�
 某個 RM 無資料時該序列 SHALL NOT 加入圖表（SHALL NOT 加入空序列），
 使圖例不出現該項。三個 RM 皆無資料時整張圖 SHALL NOT 顯示。
 
-圖表 SHALL 疊加**體重**與**體脂率**兩條序列，體脂率 SHALL 使用右側 Y 軸（百分比）。
-此疊圖回答的是「該動作的重量相對於體組成如何變化」，
-與 Dashboard 頂部 12 週容積圖的每週平均體重 SHALL NOT 視為同一項資訊——
-後者是每週平均，此處是每日值對照該動作當天的重量。
+圖表 SHALL 只呈現訓練表現，SHALL NOT 疊加體重或體脂率序列，亦 SHALL NOT
+使用右側 Y 軸。變更理由（2026-09-06）：體組成 SHALL 集中呈現於 Dashboard 頂部的
+12 週圖（見 `weekly-training-volume`），同一件事 SHALL NOT 在兩處各畫一次。
+先前版本在此疊加每日體重與體脂率，理由是「該動作的重量相對於體組成如何變化」；
+該理由已被「體組成只有一個地方」取代。
 
-體重或體脂率無資料時該序列 SHALL NOT 加入圖表，其圖例與說明文字亦
-SHALL NOT 提及該序列——SHALL NOT 出現描述一條不存在的線的文字。
-
-疊圖 SHALL NOT 使圖表在無 RM 資料時仍然顯示：三個 RM 皆無資料時整張圖
-SHALL NOT 顯示，即使體重或體脂率有資料。
+圖表 SHALL NOT 附加描述線條組成的說明文字。疊圖移除後，該文字只剩
+「左軸為訓練重量 (kg)」，而圖例已說明每條線是什麼。
 
 #### Scenario: 部分 RM 無資料
 - **WHEN** 某動作有 5RM 資料但無 1RM 與 3RM 資料
@@ -112,14 +110,10 @@ SHALL NOT 顯示，即使體重或體脂率有資料。
 - **WHEN** 某動作所有紀錄的 `reps` 皆為 8
 - **THEN** 圖表 SHALL NOT 顯示，SHALL NOT 顯示空白圖框
 
-#### Scenario: 體脂無資料時不畫死線
-- **WHEN** 期間內沒有任何一筆體脂率紀錄
-- **THEN** 圖表 SHALL NOT 出現體脂序列與其圖例，說明文字 SHALL NOT 提及體脂率，
-  其餘序列 SHALL 正常顯示
-
-#### Scenario: 只有體重資料不足以撐起圖表
-- **WHEN** 某動作三個 RM 皆無資料，但期間內有體重紀錄
-- **THEN** 圖表 SHALL NOT 顯示
+#### Scenario: 有體組成資料也不疊圖
+- **WHEN** 期間內有體重與體脂率紀錄，且某動作有 RM 資料
+- **THEN** 圖表 SHALL 只顯示 RM 序列，圖例 SHALL NOT 出現體重或體脂率，
+  且 SHALL NOT 出現右側 Y 軸
 
 ### Requirement: Recent Training Detail
 面板 SHALL 顯示該動作在**含今天在內往回 14 天**的滾動視窗內，每個訓練日的明細：

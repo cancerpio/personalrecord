@@ -13,6 +13,32 @@ const volumeInfo = computed(() => sessionStore.weeklyTrainingVolumeInfo);
 const volume12 = computed(() => sessionStore.trailing12WeekVolumeInfo);
 const exerciseOverview = computed(() => sessionStore.exerciseOverview);
 const hasAnyBodyWeight = computed(() => volume12.value.weeks.some(w => w.avgBodyWeight != null));
+const hasAnyBodyFat = computed(() => volume12.value.weeks.some(w => w.avgBodyFat != null));
+
+// footer 的 12 週平均體重／體脂率。兩者共用「沒量的週跳過、不含本週」的基準定義，
+// 與標頭體重 chip 的比較對象是同一個數（store 只算一次）。
+// 無紀錄時顯示破折號而不是省略欄位——欄位在，才看得出這格量了就會有數字。
+const baselineBodyWeightText = computed(() => {
+  const v = volumeInfo.value.baselineBodyWeight;
+  return v != null ? `${v.toFixed(1)} kg` : '—';
+});
+const baselineBodyFatText = computed(() => {
+  const v = volumeInfo.value.baselineBodyFat;
+  return v != null ? `${v.toFixed(1)}%` : '—';
+});
+
+// 折線用的 y 軸範圍：夾在最小與最大跨度之間。
+// 最小跨度防止雜訊被放大成趨勢，最大跨度防止單一離群值把整條線壓平。
+function axisRange(values, minSpan, maxSpan, pad) {
+  if (!values.length) return {};
+  let lo = Math.min(...values) - pad;
+  let hi = Math.max(...values) + pad;
+  const span = hi - lo;
+  const mid = (lo + hi) / 2;
+  if (span < minSpan) { lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+  else if (span > maxSpan) { lo = mid - maxSpan / 2; hi = mid + maxSpan / 2; }
+  return { min: lo, max: hi };
+}
 
 // ---- 標頭雙欄摘要 ----
 const headerVolume = computed(() => volumeInfo.value.currentVolume.toLocaleString());
@@ -66,6 +92,7 @@ const volumeChartOptions = computed(() => {
   const blue = dark ? '#0A84FF' : '#007AFF';
   const blueSoft = dark ? 'rgba(10,132,255,0.38)' : 'rgba(0,122,255,0.32)';
   const orange = dark ? '#FF9F0A' : '#D97706';
+  const purple = dark ? '#BF5AF2' : '#AF52DE';
   const ghostFill = dark ? 'rgba(10,132,255,0.14)' : 'rgba(0,122,255,0.10)';
   const muted = dark ? '#98989E' : '#8E8E93';
   const avg = volume12.value.average;
@@ -90,21 +117,12 @@ const volumeChartOptions = computed(() => {
     return { y: w.volume, color: blueSoft };
   });
   const bwData = weeks.map(w => (w.avgBodyWeight != null ? Number(w.avgBodyWeight.toFixed(1)) : null));
+  const bfData = weeks.map(w => (w.avgBodyFat != null ? Number(w.avgBodyFat.toFixed(1)) : null));
 
-  // 右軸範圍策略：最小跨度 8kg（防雜訊放大）、最大跨度 50kg（防離群值撐爆）
-  const bwVals = weeks.map(w => w.avgBodyWeight).filter(v => v != null);
-  let bwAxisMin, bwAxisMax;
-  if (bwVals.length) {
-    let lo = Math.min(...bwVals) - 0.5;
-    let hi = Math.max(...bwVals) + 0.5;
-    const span = hi - lo;
-    const MIN_SPAN = 8, MAX_SPAN = 50;
-    const mid = (lo + hi) / 2;
-    if (span < MIN_SPAN) { lo = mid - MIN_SPAN / 2; hi = mid + MIN_SPAN / 2; }
-    else if (span > MAX_SPAN) { lo = mid - MAX_SPAN / 2; hi = mid + MAX_SPAN / 2; }
-    bwAxisMin = lo;
-    bwAxisMax = hi;
-  }
+  // 體重右軸：最小跨度 8kg（防雜訊放大）、最大跨度 50kg（防離群值撐爆）
+  const bwAxis = axisRange(weeks.map(w => w.avgBodyWeight).filter(v => v != null), 8, 50, 0.5);
+  // 體脂軸：同一策略換成百分點的量級（最小 4、最大 20）
+  const bfAxis = axisRange(weeks.map(w => w.avgBodyFat).filter(v => v != null), 4, 20, 0.5);
 
   return {
     chart: {
@@ -145,9 +163,20 @@ const volumeChartOptions = computed(() => {
         title: { text: null },
         opposite: true,
         gridLineWidth: 0,
-        min: bwAxisMin,
-        max: bwAxisMax,
+        min: bwAxis.min,
+        max: bwAxis.max,
         labels: { style: { color: orange, fontSize: '10px', fontWeight: '600' }, format: '{value:.0f}' }
+      },
+      {
+        // 體脂自己的尺度，與 kg 無關：18% 不會落在 18kg 的位置。
+        // 刻意不畫刻度——右側已有一排體重刻度，手機寬度再擠一排會蓋掉圖；
+        // 這條線負責形狀，數值由 tooltip 給。
+        title: { text: null },
+        opposite: true,
+        gridLineWidth: 0,
+        min: bfAxis.min,
+        max: bfAxis.max,
+        labels: { enabled: false }
       }
     ],
     legend: {
@@ -170,8 +199,12 @@ const volumeChartOptions = computed(() => {
         const bwLine = w.avgBodyWeight != null
           ? `體重：<b>${w.avgBodyWeight.toFixed(1)}</b> kg`
           : '體重：無紀錄';
+        // 體脂只在畫得出線時才進 tooltip：全期無資料時多一行「無紀錄」只是噪音
+        const bfLine = hasAnyBodyFat.value
+          ? `<br/>${w.avgBodyFat != null ? `體脂率：<b>${w.avgBodyFat.toFixed(1)}</b>%` : '體脂率：無紀錄'}`
+          : '';
         return `<div style="font-size:11px;opacity:.7;margin-bottom:2px">${w.rangeLabel}${w.isCurrent ? ' · 本週進行中' : ''}</div>`
-          + `容積：<b>${w.volume.toLocaleString()}</b> kg<br/>${bwLine}`;
+          + `容積：<b>${w.volume.toLocaleString()}</b> kg<br/>${bwLine}${bfLine}`;
       }
     },
     plotOptions: {
@@ -186,7 +219,19 @@ const volumeChartOptions = computed(() => {
     },
     series: [
       { name: '週容積', type: 'column', yAxis: 0, data: volumeData, color: blueSoft },
-      { name: '週平均體重', type: 'line', yAxis: 1, data: bwData }
+      { name: '週平均體重', type: 'line', yAxis: 1, data: bwData, color: orange },
+      // 無體脂資料時整條序列不加入，圖例才不會出現一個永遠沒有線的項目。
+      // 標記保留：connectNulls 為 false 時，孤立的一週若沒有標記會完全畫不出來。
+      ...(hasAnyBodyFat.value ? [{
+        name: '週平均體脂率',
+        type: 'line',
+        yAxis: 2,
+        data: bfData,
+        color: purple,
+        dashStyle: 'ShortDash',
+        lineWidth: 2,
+        marker: { enabled: true, radius: 3, symbol: 'diamond' }
+      }] : [])
     ]
   };
 });
@@ -269,7 +314,8 @@ onMounted(() => {
       </div>
 
       <div class="volume-footer">
-        <span class="history-average">過去 12 個完整週平均：{{ volume12.average.toLocaleString() }} kg／週（不含本週）</span>
+        <span class="history-average">過去 12 週平均容積：{{ volume12.average.toLocaleString() }} kg（不含本週）</span>
+        <span class="history-average">過去 12 週平均體重／體脂率：{{ baselineBodyWeightText }}／{{ baselineBodyFatText }}（不含本週）</span>
       </div>
     </div>
 
@@ -430,8 +476,8 @@ onMounted(() => {
   border-top: 0.5px solid var(--separator-color);
   padding-top: 8px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .history-average {
