@@ -2,7 +2,7 @@
 
 ## Purpose
 本能力在「最近動作總覽」的資料列下方展開一個面板，針對**單一動作**同時回答
-排課表時要問的兩件事：**歷史紀錄是多少**（1RM / 3RM / 5RM，含達成日期與達成次數）、
+排課表時要問的兩件事：**歷史紀錄是多少**（1RM / 3RM / 5RM，含首次達成日期）、
 **最近兩週實際做了什麼**（哪幾天、幾組、幾下、多重）。
 
 本能力只呈現資訊，不發出通知，不修改任何資料。
@@ -13,8 +13,7 @@
 ## Requirements
 
 ### Requirement: Strict Rep Records
-面板 SHALL 為 1RM、3RM、5RM 各提供一筆紀錄，每筆包含**重量**、**首次達成日期**、
-**達成天數**與**達成組數**。
+面板 SHALL 為 1RM、3RM、5RM 各提供一筆紀錄，每筆包含**重量**與**首次達成日期**。
 
 RM 的判定 SHALL 為**嚴格 reps 相等**（1RM 為 `reps === 1`，3RM 為 `reps === 3`，
 5RM 為 `reps === 5`），SHALL NOT 解讀為「至少 N 下」。此定義沿用既有圖表，
@@ -43,35 +42,6 @@ SHALL NOT 與總覽表的「最大重量」（不限 reps）混用名稱。
 - **WHEN** 某動作有 `reps === 1` 但 `weight` 為空字串的紀錄
 - **THEN** 該筆 SHALL 被略過，1RM SHALL 取自其餘有效紀錄
 
-### Requirement: Record Achievement Count
-每筆紀錄 SHALL 同時顯示該重量的**達成天數**與**達成組數**，兩者 SHALL 分別呈現。
-
-只達成過一次的紀錄與達成過多次的紀錄在可信度上有實質差異，
-而單筆輸入錯誤產生的紀錄必然是孤例。顯示次數使可疑值自行浮現，
-SHALL NOT 需要使用者主動比對。
-
-達成次數 SHALL 以中性文字呈現，SHALL NOT 使用警示顏色、icon 或任何警報語彙，
-亦 SHALL NOT 自動排除或隱藏任何紀錄——本能力不判定資料真偽，只呈現可判定的依據。
-
-計數對象 SHALL 為**該 RM 之下、`weight` 恰好等於紀錄重量的紀錄**，
-SHALL NOT 包含較輕的組，亦 SHALL NOT 跨 RM 合併計算。
-
-天數與組數 SHALL 分開計算：同一天內多組達成同一重量時，天數 SHALL 為 1、
-組數 SHALL 為實際筆數。
-
-#### Scenario: 同一天多組達成
-- **WHEN** 某動作於 08-30 做了四組 `75×1`，且 75 為 1RM 紀錄，其他日期皆未達到 75
-- **THEN** 達成天數 SHALL 為 1，達成組數 SHALL 為 4
-
-#### Scenario: 跨多日達成
-- **WHEN** 某動作於五個不同日期各做到一組 `140×1`，且 140 為 1RM 紀錄
-- **THEN** 達成天數 SHALL 為 5，達成組數 SHALL 為 5
-
-#### Scenario: 孤例紀錄不被隱藏
-- **WHEN** 某動作的 1RM 只在單一日期達成過單一組
-- **THEN** 該紀錄 SHALL 正常顯示，達成 SHALL 標示為 1 天／1 次，
-  SHALL NOT 被排除、標紅或伴隨警示符號
-
 ### Requirement: Achievement History Drilldown
 每一筆紀錄列 SHALL 可展開，顯示該 RM 的**完整達成史**：
 所有符合該 reps 的訓練日及當日該 reps 的最大重量，依日期由新到舊排列。
@@ -99,8 +69,16 @@ SHALL NOT 提供年月篩選——單一動作的訓練日數有限，篩選不�
 某個 RM 無資料時該序列 SHALL NOT 加入圖表（SHALL NOT 加入空序列），
 使圖例不出現該項。三個 RM 皆無資料時整張圖 SHALL NOT 顯示。
 
-圖表 SHALL NOT 疊加體重或體脂序列。體脂資料源實際上不存在，
-而體重已由 Dashboard 頂部的 12 週容積圖呈現。
+圖表 SHALL 疊加**體重**與**體脂率**兩條序列，體脂率 SHALL 使用右側 Y 軸（百分比）。
+此疊圖回答的是「該動作的重量相對於體組成如何變化」，
+與 Dashboard 頂部 12 週容積圖的每週平均體重 SHALL NOT 視為同一項資訊——
+後者是每週平均，此處是每日值對照該動作當天的重量。
+
+體重或體脂率無資料時該序列 SHALL NOT 加入圖表，其圖例與說明文字亦
+SHALL NOT 提及該序列——SHALL NOT 出現描述一條不存在的線的文字。
+
+疊圖 SHALL NOT 使圖表在無 RM 資料時仍然顯示：三個 RM 皆無資料時整張圖
+SHALL NOT 顯示，即使體重或體脂率有資料。
 
 #### Scenario: 部分 RM 無資料
 - **WHEN** 某動作有 5RM 資料但無 1RM 與 3RM 資料
@@ -109,6 +87,15 @@ SHALL NOT 提供年月篩選——單一動作的訓練日數有限，篩選不�
 #### Scenario: 三個 RM 皆無資料
 - **WHEN** 某動作所有紀錄的 `reps` 皆為 8
 - **THEN** 圖表 SHALL NOT 顯示，SHALL NOT 顯示空白圖框
+
+#### Scenario: 體脂無資料時不畫死線
+- **WHEN** 期間內沒有任何一筆體脂率紀錄
+- **THEN** 圖表 SHALL NOT 出現體脂序列與其圖例，說明文字 SHALL NOT 提及體脂率，
+  其餘序列 SHALL 正常顯示
+
+#### Scenario: 只有體重資料不足以撐起圖表
+- **WHEN** 某動作三個 RM 皆無資料，但期間內有體重紀錄
+- **THEN** 圖表 SHALL NOT 顯示
 
 ### Requirement: Recent Training Detail
 面板 SHALL 顯示該動作在**含今天在內往回 14 天**的滾動視窗內，每個訓練日的明細：
