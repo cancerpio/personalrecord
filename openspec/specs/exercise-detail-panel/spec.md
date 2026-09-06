@@ -42,6 +42,30 @@ SHALL NOT 與總覽表的「最大重量」（不限 reps）混用名稱。
 - **WHEN** 某動作有 `reps === 1` 但 `weight` 為空字串的紀錄
 - **THEN** 該筆 SHALL 被略過，1RM SHALL 取自其餘有效紀錄
 
+### Requirement: Easy Max
+1RM 紀錄 SHALL 附帶 **Easy Max**：該 1RM 重量的 90%，四捨五入至小數點一位。
+
+Easy Max SHALL 為衍生值，SHALL NOT 另行儲存——1RM 更新時它 SHALL 自動反映，
+因此 SHALL NOT 存在「未同步」的狀態。
+
+某動作沒有嚴格 1RM 紀錄時 SHALL NOT 顯示 Easy Max，
+SHALL NOT 以 0、破折號或任何佔位符代替。沒有 1RM 的動作是常態而非例外。
+
+Easy Max SHALL NOT 加入折線圖——它是 1RM 的固定倍數，
+其曲線與 1RM 序列平行，SHALL NOT 視為新增資訊。
+
+#### Scenario: 由 1RM 導出
+- **WHEN** 某動作的 1RM 為 140
+- **THEN** Easy Max SHALL 為 126
+
+#### Scenario: 四捨五入至小數點一位
+- **WHEN** 某動作的 1RM 為 107
+- **THEN** Easy Max SHALL 為 96.3
+
+#### Scenario: 沒有 1RM 時不顯示
+- **WHEN** 某動作有 5RM 紀錄但沒有任何 `reps === 1` 的紀錄
+- **THEN** SHALL NOT 顯示 Easy Max，SHALL NOT 顯示 0 或破折號
+
 ### Requirement: Achievement History Drilldown
 每一筆紀錄列 SHALL 可展開，顯示該 RM 的**完整達成史**：
 所有符合該 reps 的訓練日及當日該 reps 的最大重量，依日期由新到舊排列。

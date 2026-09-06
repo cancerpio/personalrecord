@@ -865,3 +865,49 @@ describe('getExerciseRecentDetail — 近 14 天每日明細（#26）', () => {
     expect(store.getExerciseRecentDetail('Squat')).toEqual({ days: [], lastBefore: null });
   });
 });
+
+describe('getEasyMax — 1RM 的 90%（#26 後續）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  const s = (date, weight, reps, exercise = 'Squat') =>
+    ({ id: `${exercise}-${date}-${weight}x${reps}`, date, exercise, weight, reps });
+
+  it('回傳 1RM 的 90%', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 140, 1)];
+    expect(store.getEasyMax('Squat')).toBe(126);
+  });
+
+  it('四捨五入至小數點一位', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-18', 107, 1)];
+    expect(store.getEasyMax('Squat')).toBe(96.3);
+  });
+
+  it('浮點誤差不外露', () => {
+    // 140 * 0.9 在 JS 是 126.00000000000001，直接回傳會顯示成一長串。
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 140, 1)];
+    expect(String(store.getEasyMax('Squat'))).toBe('126');
+  });
+
+  it('取的是 1RM 而非不限 reps 的最大重量', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 100, 1), s('2026-05-14', 150, 8)];
+    expect(store.getEasyMax('Squat')).toBe(90);
+  });
+
+  it('沒有 1RM 時回傳 null，即使有 3RM 與 5RM', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 120, 3), s('2026-05-14', 100, 5)];
+    expect(store.getEasyMax('Squat')).toBeNull();
+  });
+
+  it('完全沒有該動作的紀錄時回傳 null', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-05-14', 140, 1, 'Deadlift')];
+    expect(store.getEasyMax('Squat')).toBeNull();
+  });
+});
