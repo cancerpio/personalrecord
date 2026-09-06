@@ -44,8 +44,8 @@ function maxWeightText(row) {
 <template>
   <div class="streak-section">
     <div class="streak-header">
-      <h2>最近動作總覽</h2>
-      <p class="streak-desc">最近練過的 12 個動作。</p>
+      <h2>最近12週動作總覽</h2>
+      <p class="streak-desc">近期練過的動作。持續週數＝同一動作目前連續幾週沒換過。</p>
     </div>
 
     <div class="streak-panel glass-panel">
@@ -59,7 +59,7 @@ function maxWeightText(row) {
           <span class="col-exercise">動作</span>
           <span class="col-recent">近2週</span>
           <span class="col-max">最重</span>
-          <span class="col-weeks">持續</span>
+          <span class="col-weeks">持續週數</span>
         </div>
         <template v-for="row in rows" :key="row.exercise">
           <div
@@ -100,7 +100,7 @@ function maxWeightText(row) {
 
 .streak-row {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto 52px 34px;
+  grid-template-columns: 14px minmax(0, 1fr) auto 44px 48px;
   align-items: center;
   gap: 10px;
   height: 30px;
