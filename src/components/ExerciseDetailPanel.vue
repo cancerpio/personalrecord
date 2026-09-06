@@ -64,61 +64,23 @@ const rmSeries = computed(() =>
     .filter(s => s.data.length > 0)
 );
 
-const bodyWeightSeries = computed(() => sessionStore.getChartSeriesForBodyWeight('all', 'all'));
-const bodyFatSeries = computed(() => sessionStore.getChartSeriesForBodyFat('all', 'all'));
-
-// 三個 RM 皆無資料時整張圖不顯示。體重／體脂有資料也不例外——
-// 只畫體重的圖與「這個動作」無關，那是頂部 12 週圖已經回答過的問題。
+// 三個 RM 皆無資料時整張圖不顯示。
 const showChart = computed(() => rmSeries.value.length > 0);
 
 const RM_COLORS = { '1RM': '#10b981', '3RM': '#0A84FF', '5RM': '#AF52DE' };
 
-const chartSeries = computed(() => {
-  const series = rmSeries.value.map(s => ({
+// 這張圖只回答訓練表現。體重與體脂率已移除（2026-09-06）：
+// 體組成集中在 Dashboard 頂部的 12 週圖，同一件事不在兩個地方各畫一次。
+const chartSeries = computed(() =>
+  rmSeries.value.map(s => ({
     name: s.name,
     type: 'spline',
     color: RM_COLORS[s.name],
     data: s.data,
     yAxis: 0,
     marker: { enabled: true, radius: 3 }
-  }));
-
-  if (bodyWeightSeries.value.length > 0) {
-    series.push({
-      name: '體重',
-      type: 'spline',
-      color: '#64748b',
-      data: bodyWeightSeries.value,
-      yAxis: 0,
-      dashStyle: 'Dot',
-      marker: { enabled: false }
-    });
-  }
-
-  if (bodyFatSeries.value.length > 0) {
-    series.push({
-      name: '體脂率',
-      type: 'spline',
-      color: '#fb923c',
-      data: bodyFatSeries.value,
-      yAxis: 1,
-      dashStyle: 'ShortDash',
-      marker: { enabled: false }
-    });
-  }
-
-  return series;
-});
-
-// 說明文字依實際畫出來的序列組出來。
-// 舊版寫死「右側虛線代表體脂率」，而當時根本沒有體脂資料——
-// 描述一條不存在的線比不描述更糟。
-const chartDesc = computed(() => {
-  const parts = ['左軸為訓練重量 (kg)'];
-  if (bodyWeightSeries.value.length > 0) parts.push('點線為體重');
-  if (bodyFatSeries.value.length > 0) parts.push('右軸虛線為體脂率 (%)');
-  return parts.join('，') + '。';
-});
+  }))
+);
 
 // ---- 近 14 天明細 ----
 const recentDetail = computed(() => sessionStore.getExerciseRecentDetail(props.exercise));
@@ -176,8 +138,7 @@ onMounted(() => {
     <!-- 折線圖 -->
     <template v-if="showChart">
       <div class="chart-block">
-        <HistoryChart :series="chartSeries" :dualAxis="true" />
-        <p class="chart-desc">{{ chartDesc }}</p>
+        <HistoryChart :series="chartSeries" :dualAxis="false" />
       </div>
       <div class="panel-sep"></div>
     </template>
@@ -312,14 +273,6 @@ onMounted(() => {
 
 .hist-date {
   color: var(--text-secondary);
-}
-
-/* ---- 折線圖 ---- */
-.chart-desc {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin: 6px 0 0;
-  line-height: 1.4;
 }
 
 /* ---- 近 14 天 ---- */

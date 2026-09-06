@@ -241,6 +241,109 @@ describe('trailing12WeekVolumeInfo — 每週平均體重', () => {
   });
 });
 
+describe('12 週基準體重／體脂 — footer 的「過去 12 週平均」', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-08T12:00:00Z')); // 當週 = 2026-07-06 那週
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const bm = (date, fields) => ({ id: date, date, ...fields });
+
+  it('體重基準跳過沒量的週，且不含本週', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      bm('2026-06-29', { bodyWeight: 76.0 }), // 視窗內唯一有紀錄的完整週
+      bm('2026-07-06', { bodyWeight: 90.0 }), // 當週，不得計入
+    ];
+    expect(store.weeklyTrainingVolumeInfo.baselineBodyWeight).toBe(76.0);
+  });
+
+  it('體脂基準沿用同一組視窗與跳過規則，四捨五入到小數一位', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      bm('2026-06-29', { fatPercentage: 18.0 }),
+      bm('2026-06-22', { fatPercentage: 17.5 }),
+      bm('2026-07-06', { fatPercentage: 30.0 }), // 當週，不得計入
+    ];
+    expect(store.weeklyTrainingVolumeInfo.baselineBodyFat).toBe(17.8); // (18.0 + 17.5) / 2 = 17.75
+  });
+
+  it('沒有任何體脂紀錄時基準為 null（不得為 0）', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [bm('2026-06-29', { bodyWeight: 80.0 })];
+    expect(store.weeklyTrainingVolumeInfo.baselineBodyFat).toBeNull();
+  });
+
+  it('視窗外（往回第 13 週）的紀錄不計入兩項基準', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      bm('2026-04-06', { bodyWeight: 60.0, fatPercentage: 5.0 }), // 視窗外
+      bm('2026-06-29', { bodyWeight: 80.0, fatPercentage: 20.0 }),
+    ];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.baselineBodyWeight).toBe(80.0);
+    expect(info.baselineBodyFat).toBe(20.0);
+  });
+
+  it('體重基準與 chip 的差值出自同一個數', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      bm('2026-06-29', { bodyWeight: 80.0 }),
+      bm('2026-07-06', { bodyWeight: 81.2 }),
+    ];
+    const info = store.weeklyTrainingVolumeInfo;
+    expect(info.baselineBodyWeight).toBe(80.0);
+    expect(info.bodyWeightDelta).toBe(1.2);
+  });
+
+  it('空字串與非數字的體脂紀錄不影響基準', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      bm('2026-06-29', { fatPercentage: '' }),
+      bm('2026-06-22', { fatPercentage: 'abc' }),
+      bm('2026-06-15', { fatPercentage: 16.0 }),
+    ];
+    expect(store.weeklyTrainingVolumeInfo.baselineBodyFat).toBe(16.0);
+  });
+});
+
+describe('trailing12WeekVolumeInfo — 每週平均體脂', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-08T12:00:00Z'));
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('沒有體脂紀錄的週為 null（不補 0、不內插）', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [{ id: '1', date: '2026-06-29', fatPercentage: 18.0 }];
+    const weeks = store.trailing12WeekVolumeInfo.weeks;
+    expect(weeks.find(w => w.monday === '2026-06-29').avgBodyFat).toBeCloseTo(18.0, 5);
+    expect(weeks.find(w => w.monday === '2026-06-22').avgBodyFat).toBeNull();
+  });
+
+  it('同一週多筆體脂取平均', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [
+      { id: '1', date: '2026-06-29', fatPercentage: 17.4 },
+      { id: '2', date: '2026-07-01', fatPercentage: 18.0 },
+    ];
+    const wk = store.trailing12WeekVolumeInfo.weeks.find(w => w.monday === '2026-06-29');
+    expect(wk.avgBodyFat).toBeCloseTo(17.7, 5);
+  });
+
+  it('體重與體脂各自獨立缺值', () => {
+    const store = useSessionStore();
+    store.bodyMetrics = [{ id: '1', date: '2026-06-29', bodyWeight: 81.0 }];
+    const wk = store.trailing12WeekVolumeInfo.weeks.find(w => w.monday === '2026-06-29');
+    expect(wk.avgBodyWeight).toBeCloseTo(81.0, 5);
+    expect(wk.avgBodyFat).toBeNull();
+  });
+});
+
 describe('getLastSetForExercise — 帶出該動作的最後一組', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

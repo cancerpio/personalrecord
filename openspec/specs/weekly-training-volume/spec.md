@@ -171,12 +171,86 @@ This capability calculates and tracks the weekly training volume and provides co
 - **WHEN** 過去 12 週皆無任何體重紀錄
 - **THEN** 圖表 SHALL 不繪製體重折線，並顯示引導訊息（提示記錄體重即可對照），而非留白或異常
 
+### Requirement: Provide Trailing 12-Week Average Body Fat
+系統 SHALL 在最近 12 週的序列中，為每一週提供該週的平均體脂率 `avgBodyFat`。每一週的平均體脂率 SHALL 為該週（沿用既有週邊界定義）內所有 `fatPercentage` 紀錄的算術平均；**該週若無任何體脂紀錄，`avgBodyFat` SHALL 為 `null`**（不得補 0，不得內插）。
+
+體重與體脂 SHALL **各自判定缺值**，SHALL NOT 共用同一組「有紀錄的週」——量了體重不代表當天也量了體脂，反之亦然。
+
+`fatPercentage` 為 `undefined`、`null`、空字串或非數字的紀錄 SHALL 被略過，SHALL NOT 使該週平均成為 `NaN`。
+
+#### Scenario: 週平均為該週體脂紀錄之平均
+- **WHEN** 某一週內有體脂紀錄 17.4 與 18.0
+- **THEN** 該週 `avgBodyFat` SHALL 為 17.7
+
+#### Scenario: 無體脂紀錄的週為 null
+- **WHEN** 某一週內沒有任何體脂紀錄
+- **THEN** 該週 `avgBodyFat` SHALL 為 `null`（而非 0）
+
+#### Scenario: 體重與體脂各自缺值
+- **WHEN** 某一週只有體重紀錄、沒有體脂紀錄
+- **THEN** 該週 `avgBodyWeight` SHALL 有值且 `avgBodyFat` SHALL 為 `null`
+
+### Requirement: Display Weekly Average Body Fat Line Overlay
+首頁 12 週容積圖 SHALL 疊加一條「每週平均體脂率」折線，使用**第三個 Y 軸**（獨立尺度）。體脂率與 kg 無共同單位，SHALL NOT 與體重共用同一個軸——否則 18% 會被畫在 18 kg 的位置。
+
+體脂軸 SHALL NOT 顯示刻度標籤。理由：右側已有一排體重刻度，於 LIFF 手機寬度再擠一排會覆蓋圖面；此折線負責呈現形狀，數值 SHALL 由互動明細（tooltip）提供。
+
+體脂折線 SHALL 以**虛線**呈現，且 SHALL 使用與容積、體重皆可區分的色相。SHALL 保留資料點標記——缺值週斷線的情況下，孤立的一週若無標記將完全無法呈現。
+
+`avgBodyFat` 為 `null` 的週，折線 SHALL 於該處斷開（不畫點、不連線）。**12 週內完全沒有體脂紀錄時，該序列 SHALL NOT 加入圖表**，圖例 SHALL NOT 出現該項，互動明細亦 SHALL NOT 顯示體脂列——SHALL NOT 出現一個永遠沒有線的圖例項或一行永遠「無紀錄」的明細。
+
+體脂軸範圍 SHALL 沿用體重軸的夾制策略，量級改為百分點：最小跨度 4、最大跨度 20。
+
+#### Scenario: 有體脂資料時以虛線疊加於獨立軸
+- **WHEN** 12 週內有體脂紀錄
+- **THEN** 圖表 SHALL 以虛線顯示每週平均體脂率，使用獨立於容積與體重的第三軸，且該軸 SHALL NOT 顯示刻度標籤
+
+#### Scenario: 全無體脂資料時不出現任何痕跡
+- **WHEN** 12 週內沒有任何體脂紀錄
+- **THEN** 圖表 SHALL NOT 加入體脂序列，圖例 SHALL NOT 出現體脂率，互動明細 SHALL NOT 出現體脂列
+
+#### Scenario: 缺值週折線斷開
+- **WHEN** 12 週中部分週有體脂紀錄、部分週沒有
+- **THEN** 體脂折線 SHALL 在無紀錄的週斷開，該週的互動明細 SHALL 標示為無紀錄
+
+#### Scenario: 互動明細顯示體脂數值
+- **WHEN** 使用者 hover 或點擊某一週，且 12 週內有體脂紀錄
+- **THEN** 明細 SHALL 顯示該週平均體脂率的百分比數值
+
+### Requirement: Display Trailing 12-Week Baseline Body Composition
+容積卡片底部 SHALL 以兩行顯示三項 12 週基準，全部標明「不含本週」：
+
+```
+過去 12 週平均容積：5,901 kg（不含本週）
+過去 12 週平均體重／體脂率：81.0 kg／18.2%（不含本週）
+```
+
+容積該行 SHALL NOT 使用「12 個完整週」與「kg／週」的寫法。變更理由（2026-09-06）：「完整週」的資訊已由「不含本週」表達，「kg／週」的「／週」則由「平均」表達，兩者皆為重複。
+
+**12 週平均體重與 12 週平均體脂率 SHALL 為 `Calculate Current Week Average Body Weight and Trend` 所定義的同一個基準值**（同一視窗、空白週跳過、四捨五入到小數一位），SHALL NOT 另行計算。體重基準因此永遠與標頭 chip 的比較對象同值。
+
+某項基準無可用資料時，該項 SHALL 顯示破折號（`—`），**該欄位 SHALL NOT 被省略**。理由：欄位存在才看得出「這格量了就會有數字」；體脂測量頻率低，長期為空是常態而非錯誤。
+
+#### Scenario: 兩項體組成基準皆有資料
+- **WHEN** 12 週視窗內有體重與體脂紀錄
+- **THEN** 卡片底部第二行 SHALL 顯示兩者的數值，各為一位小數，並標明不含本週
+
+#### Scenario: 有體重但無體脂
+- **WHEN** 12 週視窗內有體重紀錄但沒有任何體脂紀錄
+- **THEN** 該行 SHALL 顯示體重數值與體脂的破折號，SHALL NOT 省略體脂欄位
+
+#### Scenario: 體重基準與標頭 chip 同源
+- **WHEN** 12 週基準體重為 80.0、當週平均體重為 81.2
+- **THEN** 底部 SHALL 顯示 `80.0 kg`，且標頭 chip SHALL 顯示 `+1.2 kg`
+
 ### Requirement: Calculate Current Week Average Body Weight and Trend
 系統 SHALL 提供「當週平均體重」＝當週（週一到週日）內所有體重紀錄 `bodyWeight` 的算術平均，供首頁右欄顯示；當週無體重紀錄時 SHALL 以無資料狀態呈現。
 
 系統 SHALL 以當週平均體重對「12 週基準（體重）」相比，判定變化方向與變化量（kg）。
 
-**12 週基準（體重）** SHALL 沿用與容積相同的 12 週視窗，但空白週的處理 SHALL 與容積不同：**沒有體重紀錄的週 SHALL 被跳過而非補 0**，分母為視窗內實際有紀錄的週數。理由：某週沒量體重不等於該週體重為 0 kg，補 0 會把基準拉到不可能的數值。
+**12 週基準（體重）** SHALL 沿用與容積相同的 12 週視窗，但空白週的處理 SHALL 與容積不同：**沒有體重紀錄的週 SHALL 被跳過而非補 0**，分母為視窗內實際有紀錄的週數。理由：某週沒量體重不等於該週體重為 0 kg，補 0 會把基準拉到不可能的數值。視窗內完全沒有體重紀錄時，基準 SHALL 為 `null`。
+
+**基準本身 SHALL 先四捨五入到小數一位，差值 SHALL 由該四捨五入後的基準算出。** 變更理由（2026-09-06）：基準值自此會直接顯示於卡片底部（見「Display Trailing 12-Week Baseline Body Composition」），若 chip 的差值改用未四捨五入的基準計算，畫面上會出現「80.0 對 80.5 卻標示 +0.6」這種自相矛盾。此規則是既有「先四捨五入再判定」原則的延伸，對判定的影響上限為 0.05 kg。
 
 門檻 SHALL 為 ±0.5kg。此門檻取代先前的 ±0.3kg，理由（2026-08-23，依正式資料實測）：相鄰週的週平均體重變化中位數 0.27kg、平均 0.43kg，±0.3kg 會使近半數的正常波動踩過門檻，訊號被雜訊稀釋。
 

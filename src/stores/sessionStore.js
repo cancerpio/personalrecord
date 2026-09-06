@@ -52,23 +52,32 @@ function computeStreakWeeks(weekSet, anchorMonday) {
     return count;
 }
 
-// 依週分組計算每週平均體重（沿用相同的 UTC 週邊界）。
-// 回傳 { '<週一>': 平均體重 }，僅包含有紀錄的週。
-function getWeeklyBodyWeightAverages(bodyMetrics) {
+// 依週分組計算某個體組成欄位的每週平均（沿用相同的 UTC 週邊界）。
+// 回傳 { '<週一>': 平均值 }，僅包含有紀錄的週——體重與體脂各自缺值，
+// 因此兩者 SHALL 分別計算，不共用同一組「有紀錄的週」。
+function getWeeklyMetricAverages(bodyMetrics, field) {
     const sums = {};
     (bodyMetrics || []).forEach(m => {
         if (!m || !m.date) return;
-        if (m.bodyWeight === undefined || m.bodyWeight === null || m.bodyWeight === '') return;
-        const bw = Number(m.bodyWeight);
-        if (Number.isNaN(bw)) return;
+        if (m[field] === undefined || m[field] === null || m[field] === '') return;
+        const value = Number(m[field]);
+        if (Number.isNaN(value)) return;
         const monday = getMondayOfDate(m.date);
         if (!sums[monday]) sums[monday] = { sum: 0, count: 0 };
-        sums[monday].sum += bw;
+        sums[monday].sum += value;
         sums[monday].count += 1;
     });
     const avgs = {};
     Object.keys(sums).forEach(k => { avgs[k] = sums[k].sum / sums[k].count; });
     return avgs;
+}
+
+// 12 週基準：視窗內「有紀錄的週」的平均，四捨五入到小數一位；完全無紀錄時為 null。
+// 空白週跳過而非補 0——某週沒量體重不等於該週體重為 0 kg（體脂同理）。
+function baselineOf(weeklyAverages, baselineWeeks) {
+    const present = baselineWeeks.filter(monday => weeklyAverages[monday] !== undefined);
+    if (present.length === 0) return null;
+    return round1(present.reduce((sum, monday) => sum + weeklyAverages[monday], 0) / present.length);
 }
 
 // 把一組紀錄整理成「每日明細」，供 #26 的詳細面板使用。
@@ -422,17 +431,19 @@ export const useSessionStore = defineStore('session', {
             // 門檻 ±0.5kg：實測相鄰週的週平均體重變化中位數 0.27kg、平均 0.43kg，
             // 舊的 ±0.3kg 會有近半數的正常波動踩過門檻，訊號被雜訊稀釋。
             const BW_THRESHOLD = 0.5;
-            const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
+            const weeklyBW = getWeeklyMetricAverages(state.bodyMetrics, 'bodyWeight');
             const currentBodyWeight = weeklyBW[currentMonday] !== undefined ? weeklyBW[currentMonday] : null;
 
-            const baselineBWWeeks = baselineWeeks.filter(monday => weeklyBW[monday] !== undefined);
+            // 兩項體組成基準走同一條規則（見 baselineOf）。體重基準同時是 chip 的比較對象
+            // 與 footer 顯示的數字——同一個值只算一次，兩處不會漂移。
+            const baselineBodyWeight = baselineOf(weeklyBW, baselineWeeks);
+            const baselineBodyFat = baselineOf(getWeeklyMetricAverages(state.bodyMetrics, 'fatPercentage'), baselineWeeks);
 
             let bodyWeightTrend = 'none';
             let bodyWeightDelta = null;
-            if (currentBodyWeight !== null && baselineBWWeeks.length > 0) {
-                const avgBW = baselineBWWeeks.reduce((sum, monday) => sum + weeklyBW[monday], 0) / baselineBWWeeks.length;
+            if (currentBodyWeight !== null && baselineBodyWeight !== null) {
                 // 先四捨五入再判定，讓門檻與畫面顯示永遠一致
-                bodyWeightDelta = round1(currentBodyWeight - avgBW);
+                bodyWeightDelta = round1(currentBodyWeight - baselineBodyWeight);
                 if (bodyWeightDelta > BW_THRESHOLD) bodyWeightTrend = 'up';
                 else if (bodyWeightDelta < -BW_THRESHOLD) bodyWeightTrend = 'down';
                 else bodyWeightTrend = 'stable';
@@ -446,7 +457,9 @@ export const useSessionStore = defineStore('session', {
                 trendPct,
                 currentBodyWeight,
                 bodyWeightTrend,
-                bodyWeightDelta
+                bodyWeightDelta,
+                baselineBodyWeight,
+                baselineBodyFat
             };
         },
 
@@ -466,7 +479,8 @@ export const useSessionStore = defineStore('session', {
                 weeklyVolumes[monday] = (weeklyVolumes[monday] || 0) + vol;
             });
 
-            const weeklyBW = getWeeklyBodyWeightAverages(state.bodyMetrics);
+            const weeklyBW = getWeeklyMetricAverages(state.bodyMetrics, 'bodyWeight');
+            const weeklyBF = getWeeklyMetricAverages(state.bodyMetrics, 'fatPercentage');
 
             const todayStr = todayLocalISO();
             const currentMonday = getMondayOfDate(todayStr);
@@ -490,8 +504,10 @@ export const useSessionStore = defineStore('session', {
                 weeks.push({
                     monday: key,
                     volume: weeklyVolumes[key] || 0,
-                    // 該週平均體重；無紀錄為 null（不補 0、不內插）
+                    // 該週平均體重／體脂；無紀錄為 null（不補 0、不內插）。
+                    // 兩者各自判定缺值：量了體重不代表當天也量了體脂。
                     avgBodyWeight: weeklyBW[key] !== undefined ? weeklyBW[key] : null,
+                    avgBodyFat: weeklyBF[key] !== undefined ? weeklyBF[key] : null,
                     monthLabel,
                     rangeLabel: `${mo}/${monday.getUTCDate()}–${sunday.getUTCMonth() + 1}/${sunday.getUTCDate()}`,
                     isCurrent: key === currentMonday
