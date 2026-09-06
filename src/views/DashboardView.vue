@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import HistoryChart from '../components/HistoryChart.vue';
-import FilterControls from '../components/FilterControls.vue';
 import ExerciseOverview from '../components/ExerciseOverview.vue';
+import ExerciseDetailPanel from '../components/ExerciseDetailPanel.vue';
 import { useSessionStore } from '../stores/sessionStore.js';
 import { signed } from '../utils/format.js';
 
@@ -192,100 +191,27 @@ const volumeChartOptions = computed(() => {
   };
 });
 
-// Default to an empty string initially, the watcher will populate it if exercises exist
-const filters = ref({
-  exercise: '', 
-  rmType: '3RM',
-  year: new Date().getFullYear(),
-  month: 'all'
-});
-
 // Computed properties reading directly from the Pinia Store
 const loading = computed(() => sessionStore.isLoading);
 
-// Get a unique list of all exercises the user has actively tracked
-const uniqueExercises = computed(() => {
-  const exSet = new Set(sessionStore.sessions.map(s => s.exercise));
-  return Array.from(exSet).sort();
-});
+// ---- 動作詳細面板（手風琴）----
+// 同一時間至多展開一列：Dashboard 過長是使用者的長期抱怨，
+// 多開會讓 12 列的表變成無限捲軸。再點同一列即收合。
+// 刻意不在載入時自動展開任何一個——任意挑一個動作展開，
+// 與它取代的舊行為（圖表自動選第一個動作）是同一個缺陷。
+const expandedExercise = ref(null);
 
-// Watch for changes in uniqueExercises to auto-select the first valid exercise 
-// if current selection is empty or invalid
-watch(uniqueExercises, (newEx) => {
-  if (newEx.length > 0 && !newEx.includes(filters.value.exercise)) {
-    filters.value.exercise = newEx[0];
-  } else if (newEx.length === 0) {
-    filters.value.exercise = '';
+function toggleExercise(exercise) {
+  expandedExercise.value = expandedExercise.value === exercise ? null : exercise;
+}
+
+// 展開中的動作若因資料更新而從清單消失，狀態要跟著收掉，
+// 否則會留下一個指向不存在動作的面板。
+watch(exerciseOverview, (rows) => {
+  if (expandedExercise.value && !rows.some(r => r.exercise === expandedExercise.value)) {
+    expandedExercise.value = null;
   }
-}, { immediate: true });
-
-// Highcharts Series array
-const chartSeries = computed(() => {
-  if (uniqueExercises.value.length === 0 || !filters.value.exercise) return [];
-
-  const selectedEx = filters.value.exercise;
-  
-  // Primary Axis (Index 0) - Weight
-  const weightData = sessionStore.getChartSeriesForExercise(selectedEx, filters.value.rmType, filters.value.year, filters.value.month);
-
-  // Primary Axis (Index 0) - Body Weight
-  const bodyWeightData = sessionStore.getChartSeriesForBodyWeight(filters.value.year, filters.value.month);
-  
-  // Secondary Axis (Index 1) - Body Fat 
-  const bodyFatData = sessionStore.getChartSeriesForBodyFat(filters.value.year, filters.value.month);
-
-  return [
-    {
-      name: `${selectedEx} (${filters.value.rmType})`,
-      type: 'spline',
-      color: '#10b981', // Emerald Primary
-      data: weightData,
-      yAxis: 0,
-      marker: { enabled: true, radius: 4 }
-    },
-    {
-      name: 'Body Weight',
-      type: 'spline',
-      color: '#64748b', // Slate for secondary context
-      data: bodyWeightData,
-      yAxis: 0,
-      dashStyle: 'Dot',
-      marker: { enabled: false }
-    },
-    {
-      name: 'Body Fat %',
-      type: 'spline',
-      color: '#fb923c', // Orange Warn
-      data: bodyFatData,
-      yAxis: 1,
-      dashStyle: 'ShortDash',
-      marker: { enabled: false }
-    }
-  ]
 });
-
-// Sparklines array for the top header
-
-// 點動作總覽的某一列 → 把主圖切到該動作並捲過去。
-// 刻意只設定 exercise，不動 rmType / year / month：使用者若設過篩選那是刻意的，
-// 替他清掉屬於「系統做了他沒要求的決定」。若該組合無資料，
-// 圖表既有的空狀態會顯示出來——失敗是可見的，不是靜默的。
-const chartSectionRef = ref(null);
-const overviewSectionRef = ref(null);
-
-// 回程。點列會把使用者帶離表格，而 Dashboard 很長，手動捲回去是實質成本。
-// 常駐顯示而非只在「點列進來」時出現：做成條件顯示要多一個狀態，
-// 而這個按鈕本身沒有害處——不管怎麼捲下來的，回列表都是合理的動作。
-function backToOverview() {
-    overviewSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function focusExercise(exerciseName) {
-  filters.value = { ...filters.value, exercise: exerciseName };
-  nextTick(() => {
-    chartSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-}
 
 onMounted(() => {
   if (sessionStore.sessions.length === 0) {
@@ -348,31 +274,16 @@ onMounted(() => {
     </div>
 
     <!-- 最近動作總覽：與容積、體重同屬「這週該知道的事」，放在頂部摘要區 -->
-    <div ref="overviewSectionRef">
-      <ExerciseOverview :rows="exerciseOverview" @select="focusExercise" />
-    </div>
+    <ExerciseOverview
+      :rows="exerciseOverview"
+      :expandedExercise="expandedExercise"
+      @select="toggleExercise"
+    >
+      <template #panel="{ exercise }">
+        <ExerciseDetailPanel :exercise="exercise" />
+      </template>
+    </ExerciseOverview>
 
-    <!-- Chart Section 1: Absolute Strength & Bodyweight -->
-    <div ref="chartSectionRef" class="chart-section" :class="{ loading: loading }">
-      <div class="section-header">
-        <div class="section-header-row">
-          <h2>Performance Overview</h2>
-          <button type="button" class="back-to-list" @click="backToOverview">↑ 回到動作列表</button>
-        </div>
-        <p class="section-desc">左軸代表訓練重量 (KG)，右側虛線代表體脂率 (%)，協助分析體態變化對力量的影響。</p>
-      </div>
-      <div v-if="chartSeries.length > 0" class="chart-container glass-panel">
-        <HistoryChart :series="chartSeries" :dualAxis="true" />
-      </div>
-      <div v-else class="chart-container glass-panel empty-state">
-        <div class="empty-icon">📈</div>
-        <p>尚未有符合條件的訓練資料</p>
-        <span class="sub-text">請至 Program 開始記錄您的第一次訓練即可看見報表</span>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <FilterControls v-model:filters="filters" :availableExercises="uniqueExercises" />
   </div>
 </template>
 
@@ -526,94 +437,6 @@ onMounted(() => {
 .history-average {
   font-size: 12px;
   color: var(--text-secondary);
-}
-
-.chart-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: opacity 0.3s ease;
-}
-
-.chart-section.loading {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.section-header-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-/* 這裡用方向箭頭不違反「不使用警報語彙」——差別在於它真的可點、真的有行為。
-   舊 Sparkline 的問題是外觀像可操作元件卻不可點，屬假的暗示。 */
-.back-to-list {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.back-to-list:active {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.section-header h2 {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: var(--text-primary);
-}
-
-.section-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.chart-container {
-  padding: 16px;
-  border-radius: 20px;
-  min-height: 300px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--text-secondary);
-  height: 300px;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  font-size: 16px;
-  font-weight: 500;
-  margin: 0 0 8px 0;
-  color: var(--text-primary);
-}
-
-.empty-state .sub-text {
-  font-size: 13px;
-  opacity: 0.8;
 }
 
 .title-area h1 {

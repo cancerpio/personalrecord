@@ -235,6 +235,8 @@ getExerciseRecentDetail(exerciseName)
 - `weight` 缺失、空字串或非數字的紀錄在紀錄計算中**略過**（同 `exerciseOverview` 的 `maxWeight`）。
 - 容積用 `(reps || 0) * (weight || 0)`（同 `weeklyTrainingVolumeInfo`）。
 - 同一天相同 `weight` + `reps` 的多筆紀錄合併為 `count`（顯示為 `45×8 ×4`）。
+- 同一天內的組合依重量由小到大（同重量再比 `reps`）。來源順序不保證穩定，
+  顯示順序必須確定；由小到大也對應暖身到主組的實際進行順序。
 - 三個 RM 皆無資料時整排不顯示，分隔線也不顯示。
 - `lastBefore` 只在 `days` 為空時才有值。
 - **不做動作名稱別名合併**——`Overhead Press` 與 `Barbell Overhead Press` 仍是兩個動作

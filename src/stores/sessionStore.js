@@ -71,6 +71,35 @@ function getWeeklyBodyWeightAverages(bodyMetrics) {
     return avgs;
 }
 
+// 把一組紀錄整理成「每日明細」，供 #26 的詳細面板使用。
+// 一筆紀錄算一組；同日 weight 與 reps 皆相同的多筆合併為一列並標示筆數。
+// 容積沿用 weeklyTrainingVolumeInfo 的慣例 (reps || 0) * (weight || 0)——
+// 缺欄位的那一筆以 0 計入，而不是讓整天的容積變成 NaN。
+function buildDailyDetail(sessions) {
+    const byDate = {};
+    sessions.forEach(session => {
+        let day = byDate[session.date];
+        if (!day) day = byDate[session.date] = { date: session.date, sets: 0, volume: 0, groups: {} };
+        day.sets += 1;
+        const reps = Number(session.reps) || 0;
+        const weight = Number(session.weight) || 0;
+        day.volume += reps * weight;
+        const key = `${weight}x${reps}`;
+        if (!day.groups[key]) day.groups[key] = { weight, reps, count: 0 };
+        day.groups[key].count += 1;
+    });
+    return Object.values(byDate)
+        .map(day => ({
+            date: day.date,
+            sets: day.sets,
+            volume: day.volume,
+            // 依重量由小到大（同重量再比 reps），對應暖身到主組的實際順序。
+            // 需要一個確定的順序：來源資料的順序不保證穩定。
+            groups: Object.values(day.groups).sort((a, b) => a.weight - b.weight || a.reps - b.reps),
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+}
+
 // 12 週基準的視窗：自當週往回推的 N 個「完整週」週一（不含當週）。
 // 由舊到新回傳，供容積與體重共用同一組視窗，確保標頭 chip 與圖上基準線同值。
 const BASELINE_WEEKS = 12;
@@ -256,6 +285,62 @@ export const useSessionStore = defineStore('session', {
                 // 動作數量沒有上限（可自由輸入名稱），清單長度必須有界，
                 // 否則久了會變成一份無人閱讀的全動作清冊。取最近的 12 筆。
                 .slice(0, MAX_ROWS);
+        },
+
+        // #26 動作詳細面板：單一動作的 1RM / 3RM / 5RM 紀錄。
+        //
+        // reps 判定與 getChartSeriesForExercise 完全相同（嚴格相等，不是「至少 N 下」），
+        // 因此紀錄排的數字與底下的折線圖／達成史必定一致，不會各自算出不同的值。
+        //
+        // 日期取「首次」達成該重量的那一天，不是最近一次——這一欄回答的是
+        // 「這個紀錄多久以前立的」，取最近一次會讓久未突破的紀錄看起來很新。
+        getExerciseRecords: (state) => (exerciseName) => {
+            const records = { 1: null, 3: null, 5: null };
+            state.sessions.forEach(session => {
+                if (!session || !session.date || session.exercise !== exerciseName) return;
+                const reps = session.reps;
+                if (reps !== 1 && reps !== 3 && reps !== 5) return;
+
+                // 與 exerciseOverview 的 maxWeight 同一套略過規則。
+                const weight = Number(session.weight);
+                if (session.weight === undefined || session.weight === null
+                    || session.weight === '' || Number.isNaN(weight)) return;
+
+                const current = records[reps];
+                if (current === null || weight > current.weight) {
+                    records[reps] = { weight, firstDate: session.date };
+                } else if (weight === current.weight && session.date < current.firstDate) {
+                    current.firstDate = session.date;
+                }
+            });
+            return records;
+        },
+
+        // #26 動作詳細面板：該動作近 14 天的每日明細。
+        // 視窗長度與 exerciseOverview 一致（含今天在內往回 14 天），
+        // 否則總覽表那一列與展開後的內容會對不起來。
+        //
+        // 視窗內完全沒有紀錄時回傳 lastBefore（最後一次訓練的完整明細）：
+        // 主項目的訓練頻率本來就低於 14 天，空面板等於沒有回答問題。
+        // lastBefore 只在 days 為空時才有值，避免畫面同時出現兩份明細。
+        getExerciseRecentDetail: (state) => (exerciseName) => {
+            const RECENT_WINDOW_DAYS = 14;
+            const windowStart = shiftDays(todayLocalISO(), -(RECENT_WINDOW_DAYS - 1));
+
+            const mine = state.sessions.filter(
+                s => s && s.date && s.exercise === exerciseName);
+
+            const inWindow = mine.filter(s => s.date >= windowStart);
+            if (inWindow.length > 0) {
+                return { days: buildDailyDetail(inWindow), lastBefore: null };
+            }
+
+            let lastDate = null;
+            mine.forEach(s => { if (lastDate === null || s.date > lastDate) lastDate = s.date; });
+            if (lastDate === null) return { days: [], lastBefore: null };
+
+            const lastDay = buildDailyDetail(mine.filter(s => s.date === lastDate))[0];
+            return { days: [], lastBefore: lastDay };
         },
 
         // Weekly training volume calculation and trend
