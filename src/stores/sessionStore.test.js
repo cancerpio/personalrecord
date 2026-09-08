@@ -344,6 +344,144 @@ describe('trailing12WeekVolumeInfo — 每週平均體脂', () => {
   });
 });
 
+describe('getChartSeriesForExercise — 達成史與趨勢圖共用的當日最大重量', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  const set = (date, reps, weight, exercise = 'Deadlift') =>
+    ({ id: `${date}-${reps}-${weight}`, date, exercise, reps, weight });
+
+  it('嚴格 reps 比對，且每日取最大重量', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-01', 3, 120), set('2026-08-01', 3, 125), set('2026-08-01', 2, 130),
+      set('2026-08-08', 3, 130),
+    ];
+    expect(store.getChartSeriesForExercise('Deadlift', '3RM', 'all', 'all')).toEqual([
+      [Date.UTC(2026, 7, 1), 125],
+      [Date.UTC(2026, 7, 8), 130],
+    ]);
+  });
+
+  it('與 getExerciseRepTrends 對同一次數產生相同序列', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-01', 5, 100), set('2026-08-01', 5, 105),
+      set('2026-08-08', 5, 110),
+    ];
+    const fromHistory = store.getChartSeriesForExercise('Deadlift', '5RM', 'all', 'all');
+    const fromTrends = store.getExerciseRepTrends('Deadlift').schemes.find(s => s.reps === 5).data;
+    expect(fromTrends).toEqual(fromHistory);
+  });
+
+  it('不混入其他動作的紀錄', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-01', 5, 100, 'Deadlift'),
+      set('2026-08-01', 5, 200, 'High Bar Squat'),
+    ];
+    expect(store.getChartSeriesForExercise('Deadlift', '5RM', 'all', 'all')).toEqual([
+      [Date.UTC(2026, 7, 1), 100],
+    ]);
+  });
+});
+
+describe('getExerciseRepTrends — 折線圖的次數方案', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  const set = (date, reps, weight, exercise = 'Split Squat') =>
+    ({ id: `${date}-${reps}-${weight}-${Math.random()}`, date, exercise, reps, weight });
+
+  it('純 8 下的動作也有序列（舊版寫死 1/3/5 時整張圖是空的）', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-15', 8, 40), set('2026-08-15', 8, 40),
+      set('2026-08-21', 8, 45),
+      set('2026-09-03', 8, 45),
+    ];
+    const { schemes, hiddenCount } = store.getExerciseRepTrends('Split Squat');
+    expect(schemes).toHaveLength(1);
+    expect(schemes[0].reps).toBe(8);
+    expect(schemes[0].dayCount).toBe(3);
+    expect(hiddenCount).toBe(0);
+  });
+
+  it('每個訓練日取當日最大重量，由舊到新排序', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-09-03', 5, 100),
+      set('2026-08-15', 5, 90), set('2026-08-15', 5, 95), set('2026-08-15', 5, 80),
+    ];
+    const { schemes } = store.getExerciseRepTrends('Split Squat');
+    expect(schemes[0].data).toEqual([
+      [Date.UTC(2026, 7, 15), 95],
+      [Date.UTC(2026, 8, 3), 100],
+    ]);
+  });
+
+  it('只取訓練日數最多的前 3 種，其餘計入 hiddenCount', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      // 5 下：3 天
+      set('2026-08-01', 5, 100), set('2026-08-02', 5, 100), set('2026-08-03', 5, 100),
+      // 8 下：2 天
+      set('2026-08-01', 8, 60), set('2026-08-02', 8, 60),
+      // 3 下：2 天
+      set('2026-08-04', 3, 120), set('2026-08-05', 3, 120),
+      // 2 下：1 天 → 被擠掉
+      set('2026-08-06', 2, 130),
+    ];
+    const { schemes, hiddenCount } = store.getExerciseRepTrends('Split Squat');
+    expect(schemes.map(s => s.reps)).toEqual([3, 5, 8]); // 顯示順序由少到多
+    expect(hiddenCount).toBe(1);
+  });
+
+  it('訓練日數相同時取次數較少的那個', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-01', 1, 140), set('2026-08-02', 1, 140),
+      set('2026-08-01', 3, 120), set('2026-08-02', 3, 120),
+      set('2026-08-01', 5, 100), set('2026-08-02', 5, 100),
+      set('2026-08-01', 8, 60), set('2026-08-02', 8, 60),
+    ];
+    const { schemes, hiddenCount } = store.getExerciseRepTrends('Split Squat');
+    expect(schemes.map(s => s.reps)).toEqual([1, 3, 5]);
+    expect(hiddenCount).toBe(1);
+  });
+
+  it('略過無效的 weight 與 reps，不產生 NaN 序列', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-01', 5, ''),
+      set('2026-08-02', 5, 'abc'),
+      set('2026-08-03', 0, 100),
+      set('2026-08-04', 5, 100),
+    ];
+    const { schemes } = store.getExerciseRepTrends('Split Squat');
+    expect(schemes).toHaveLength(1);
+    expect(schemes[0].data).toEqual([[Date.UTC(2026, 7, 4), 100]]);
+  });
+
+  it('只取該動作的紀錄，不混入其他動作', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      set('2026-08-01', 5, 100, 'Split Squat'),
+      set('2026-08-01', 5, 200, 'Deadlift'),
+    ];
+    const { schemes } = store.getExerciseRepTrends('Split Squat');
+    expect(schemes[0].data).toEqual([[Date.UTC(2026, 7, 1), 100]]);
+  });
+
+  it('完全沒有有效紀錄時回傳空清單', () => {
+    const store = useSessionStore();
+    store.sessions = [];
+    expect(store.getExerciseRepTrends('Split Squat')).toEqual({ schemes: [], hiddenCount: 0 });
+  });
+});
+
 describe('getLastSetForExercise — 帶出該動作的最後一組', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

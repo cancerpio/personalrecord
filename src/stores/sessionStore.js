@@ -126,6 +126,41 @@ function getBaselineWeekKeys(currentMonday, weeks = BASELINE_WEEKS) {
     return keys;
 }
 
+// 某動作的「次數 → 訓練日 → 當日最大重量」。
+// 達成史與折線圖 SHALL 讀同一份計算（見 openspec exercise-detail-panel）——
+// 兩者是同一序列的兩種呈現，各自算遲早會不一致。
+// reps 非正整數、weight 缺失／空字串／非數字的紀錄一律略過。
+function dailyMaxByReps(sessions, exerciseName) {
+    const byReps = {};
+    (sessions || []).forEach(session => {
+        if (!session || session.exercise !== exerciseName || !session.date) return;
+        const reps = Number(session.reps);
+        if (!Number.isInteger(reps) || reps <= 0) return;
+        if (session.weight === undefined || session.weight === null || session.weight === '') return;
+        const weight = Number(session.weight);
+        if (Number.isNaN(weight)) return;
+
+        if (!byReps[reps]) byReps[reps] = {};
+        const dayMax = byReps[reps][session.date];
+        if (dayMax === undefined || weight > dayMax) byReps[reps][session.date] = weight;
+    });
+    return byReps;
+}
+
+// { date: maxWeight } → Highcharts 的 [timestamp, weight]，由舊到新。
+function toChartTuples(daysMap) {
+    return Object.entries(daysMap || {})
+        .map(([dateStr, weight]) => [utcTimestampFromISO(dateStr), weight])
+        .sort((a, b) => a[0] - b[0]);
+}
+
+// 'YYYY-MM-DD' → 當日 00:00 UTC 的毫秒數。
+// 圖表用 UTC 是為了讓點落在該日期本身，不受瀏覽器時區位移影響。
+function utcTimestampFromISO(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+}
+
 // 四捨五入到小數一位，並把 -0 正規化成 0。
 // 判定門檻與畫面顯示 SHALL 吃同一個值，避免「顯示 0.5 卻判定持平」這種自相矛盾，
 // 也避免 (-0.04).toFixed(1) 產生 "-0.0"。
@@ -526,13 +561,14 @@ export const useSessionStore = defineStore('session', {
 
         // Transforms data into [timestamp, weight] format for Highcharts
         getChartSeriesForExercise: (state) => (exerciseName, calculationType = 'PR', year = 'all', month = 'all') => {
-            let filtered = state.sessions.filter(s => s.exercise === exerciseName);
+            // 動作名稱的比對交給 dailyMaxByReps，這裡只處理年月篩選
+            let filtered = state.sessions;
 
             if (year !== 'all') {
-                filtered = filtered.filter(s => parseInt(s.date.split('-')[0]) === year);
+                filtered = filtered.filter(s => s.date && parseInt(s.date.split('-')[0]) === year);
             }
             if (month !== 'all') {
-                filtered = filtered.filter(s => parseInt(s.date.split('-')[1]) === month);
+                filtered = filtered.filter(s => s.date && parseInt(s.date.split('-')[1]) === month);
             }
 
             // Map 'PR' to exactly 1 rep, '3RM' to exactly 3 reps, '5RM' to exactly 5 reps
@@ -541,27 +577,37 @@ export const useSessionStore = defineStore('session', {
             if (calculationType === '3RM') targetReps = 3;
             else if (calculationType === '5RM') targetReps = 5;
 
-            // Filter out sets that don't match the EXACT rep requirement
-            const repFiltered = filtered.filter(s => s.reps === targetReps);
+            return toChartTuples(dailyMaxByReps(filtered, exerciseName)[targetReps]);
+        },
 
-            // Group by date to find max per day
-            const groupedByDate = {};
-            repFiltered.forEach(record => {
-                const currentMax = groupedByDate[record.date] || 0;
-                if (record.weight > currentMax) {
-                    groupedByDate[record.date] = record.weight;
-                }
-            });
+        // 折線圖的次數方案：這個動作**實際做過**的次數，依訓練日數取前 N 種。
+        //
+        // 取代寫死的 1/3/5。查證（2026-09-08，全庫 529 組）：1/3/5 只涵蓋 60% 的組，
+        // 8 下佔 25%，而純 8 下的動作（分腿蹲整個週期 20 組）在舊版連圖都沒有——
+        // 最想看趨勢的那一段剛好是空的。次數方案本來就因動作而異：
+        // 主項低次數、輔項 8 下，寫死一組等於假設所有動作用同一種練法。
+        //
+        // 每個點為該訓練日、該次數的**當日最大重量**（與達成史同一份資料）。
+        // 這是趨勢不是紀錄：練輕的那天就會往下。
+        getExerciseRepTrends: (state) => (exerciseName, maxSchemes = 3) => {
+            const byReps = dailyMaxByReps(state.sessions, exerciseName);
 
-            // Convert to Highcharts tuple [timestamp, value] sorted by time
-            const chartData = Object.entries(groupedByDate).map(([dateStr, maxWeight]) => {
-                // We use UTC so highcharts plots exactly on the date
-                const timeParts = dateStr.split('-');
-                const timestamp = Date.UTC(parseInt(timeParts[0]), parseInt(timeParts[1]) - 1, parseInt(timeParts[2]));
-                return [timestamp, maxWeight];
-            }).sort((a, b) => a[0] - b[0]);
+            const all = Object.keys(byReps).map(key => ({
+                reps: Number(key),
+                dayCount: Object.keys(byReps[key]).length,
+                data: toChartTuples(byReps[key])
+            }));
 
-            return chartData;
+            // 選：訓練日數多的優先。同數時取次數較少的那個——次數低的是主項，
+            // 資訊量較高；且必須有一個確定的規則，否則排序會隨資料順序漂移。
+            const schemes = all
+                .slice()
+                .sort((a, b) => b.dayCount - a.dayCount || a.reps - b.reps)
+                .slice(0, maxSchemes)
+                // 顯示順序固定由少到多，與紀錄排的 1RM→3RM→5RM 方向一致。
+                .sort((a, b) => a.reps - b.reps);
+
+            return { schemes, hiddenCount: all.length - schemes.length };
         },
 
         // Transforms Body Fat data into [timestamp, fatPercentage] format for Highcharts secondary axis
