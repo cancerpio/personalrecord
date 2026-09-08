@@ -54,33 +54,38 @@ function isoFromTimestamp(ts) {
 }
 
 // ---- 折線圖 ----
-const rmSeries = computed(() =>
-  RM_ROWS
-    .map(row => ({
-      name: row.label,
-      data: sessionStore.getChartSeriesForExercise(props.exercise, row.rmType, 'all', 'all')
-    }))
-    // 空序列不加入圖表，圖例才不會出現一個永遠沒有線的項目。
-    .filter(s => s.data.length > 0)
-);
+// 線是「這個動作實際做過的次數」，不是 1RM/3RM/5RM。
+// 上面那排是紀錄（罕見事件、不會往下），這張圖是趨勢（練輕就往下），兩層不同的問題。
+const MAX_SCHEMES = 3;
+const repTrends = computed(() => sessionStore.getExerciseRepTrends(props.exercise, MAX_SCHEMES));
 
-// 三個 RM 皆無資料時整張圖不顯示。
-const showChart = computed(() => rmSeries.value.length > 0);
+// 完全沒有有效紀錄時整張圖不顯示（總覽表只列有紀錄的動作，正常流程下不可達）。
+const showChart = computed(() => repTrends.value.schemes.length > 0);
 
-const RM_COLORS = { '1RM': '#10b981', '3RM': '#0A84FF', '5RM': '#AF52DE' };
+// 依顯示順序取色（次數由少到多）。做 1/3/5 的動作因此維持原本的綠／藍／紫。
+const TREND_COLORS = ['#10b981', '#0A84FF', '#AF52DE'];
 
 // 這張圖只回答訓練表現。體重與體脂率已移除（2026-09-06）：
 // 體組成集中在 Dashboard 頂部的 12 週圖，同一件事不在兩個地方各畫一次。
 const chartSeries = computed(() =>
-  rmSeries.value.map(s => ({
-    name: s.name,
+  repTrends.value.schemes.map((scheme, i) => ({
+    name: `${scheme.reps} 下`,
     type: 'spline',
-    color: RM_COLORS[s.name],
-    data: s.data,
+    color: TREND_COLORS[i % TREND_COLORS.length],
+    data: scheme.data,
     yAxis: 0,
     marker: { enabled: true, radius: 3 }
   }))
 );
+
+// 只在「真的有次數沒被畫出來」時才解釋挑選規則。
+// 沒篩掉任何東西卻描述一條篩選規則，只是佔版面。
+const chartNote = computed(() => {
+  const { schemes, hiddenCount } = repTrends.value;
+  return hiddenCount > 0
+    ? `只顯示最常練的 ${schemes.length} 種次數 · 每點為當日最大重量`
+    : '每點為當日最大重量';
+});
 
 // ---- 近 14 天明細 ----
 const recentDetail = computed(() => sessionStore.getExerciseRecentDetail(props.exercise));
@@ -139,6 +144,7 @@ onMounted(() => {
     <template v-if="showChart">
       <div class="chart-block">
         <HistoryChart :series="chartSeries" :dualAxis="false" />
+        <p class="chart-note">{{ chartNote }}</p>
       </div>
       <div class="panel-sep"></div>
     </template>
@@ -273,6 +279,13 @@ onMounted(() => {
 
 .hist-date {
   color: var(--text-secondary);
+}
+
+/* ---- 折線圖 ---- */
+.chart-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
 }
 
 /* ---- 近 14 天 ---- */
