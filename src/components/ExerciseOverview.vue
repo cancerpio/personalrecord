@@ -28,14 +28,6 @@ function levelOf(weeks) {
   return '';
 }
 
-// 最近 14 天的組數與次數合併成一欄，避免手機上欄位過多。
-// 該視窗內完全沒練時顯示破折號，與「0 組 0 次」區隔——
-// 前者是「這段期間沒碰」，後者會讓人以為練了但沒記到數字。
-function recentText(row) {
-  if (!row.recentSets) return '—';
-  return `${row.recentSets}組·${row.recentReps}次`;
-}
-
 function maxWeightText(row) {
   return row.maxWeight === null || row.maxWeight === undefined ? '—' : row.maxWeight;
 }
@@ -57,7 +49,6 @@ function maxWeightText(row) {
         <div class="streak-row streak-row--head">
           <span class="col-caret"></span>
           <span class="col-exercise">動作</span>
-          <span class="col-recent">近2週</span>
           <span class="col-max">最重</span>
           <span class="col-weeks">持續週數</span>
         </div>
@@ -68,7 +59,6 @@ function maxWeightText(row) {
           >
             <span class="col-caret" :class="{ open: expandedExercise === row.exercise }">▸</span>
             <span class="col-exercise">{{ row.exercise }}</span>
-            <span class="col-recent">{{ recentText(row) }}</span>
             <span class="col-max">{{ maxWeightText(row) }}</span>
             <span class="col-weeks" :class="levelOf(row.streakWeeks)">{{ row.streakWeeks }}</span>
           </div>
@@ -100,7 +90,10 @@ function maxWeightText(row) {
 
 .streak-row {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto 44px 48px;
+  /* 動作名是唯一的彈性欄，其餘固定——新增欄位等於從動作名身上扣。
+     375pt 下表格可用寬 303px，三欄時動作名有 159px，放得下 Barbell Overhead Press。
+     刻意不加寬度斷點：本應用是 LIFF app，手機是主要形態而非特例。 */
+  grid-template-columns: 14px minmax(0, 1fr) 44px 56px;
   align-items: center;
   gap: 10px;
   height: 30px;
@@ -140,14 +133,6 @@ function maxWeightText(row) {
   white-space: nowrap;
 }
 
-.col-recent {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-  color: var(--text-primary);
-}
-
 .col-max {
   font-size: 14px;
   font-variant-numeric: tabular-nums;
@@ -168,7 +153,6 @@ function maxWeightText(row) {
 .col-weeks.warning { color: #FF9500; }
 
 .streak-row--head .col-exercise,
-.streak-row--head .col-recent,
 .streak-row--head .col-max,
 .streak-row--head .col-weeks {
   font-size: 11px;

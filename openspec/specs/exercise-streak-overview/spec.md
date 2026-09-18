@@ -1,8 +1,10 @@
 # Capability: Exercise Streak Overview
 
 ## Purpose
-本能力在 Dashboard 以單一表格呈現每個動作的近況，一列同時回答三個問題：
-**目前持續幾週沒換過**、**最近 2 週做了多少**、**歷來最重多少**。
+本能力在 Dashboard 以單一表格呈現每個動作的近況，一列同時回答兩個問題：
+**目前持續幾週沒換過**、**歷來最重多少**。
+「最近 2 週做了多少」曾是本表的第三欄，現由 `exercise-detail-panel` 承載——
+手機上的欄位預算不足以同時容納它與可讀的動作名稱（見 Exercise Name Legibility）。
 連續週數用於判斷哪些動作已經連續使用同一受力結構過久、該安排變化動作，
 回答的是「現在還持續著嗎」，不是「歷史上曾經連續過幾週」。
 本能力只顯示資訊，不發出通知。
@@ -70,33 +72,6 @@ SHALL NOT 解讀為「整段期間總共只能空一週」。
 - **WHEN** 某動作已超過容許空窗未練
 - **THEN** 該動作 SHALL 出現在結果中，連續週數 SHALL 為 0
 
-### Requirement: Recent Training Volume
-每個動作 SHALL 提供最近訓練量兩個數值：**組數**與**總次數**。
-統計範圍 SHALL 為**含今天在內往回 14 天的滾動視窗**。
-
-一筆紀錄 SHALL 計為一組；總次數 SHALL 為該視窗內所有紀錄 `reps` 的總和。
-`reps` 缺失或非數字時 SHALL 以 0 計入該筆，SHALL NOT 使總和成為 `NaN`。
-視窗內沒有任何紀錄時，組數與總次數 SHALL 皆為 0。
-
-此視窗 SHALL NOT 與連續週數的週界混用。兩者刻意不同，因為回答的問題不同：
-週界（週一起算）回答「這一週有沒有練到」，滾動 14 天回答「最近兩週累積了多少」。
-
-#### Scenario: 組數為紀錄筆數，總次數為 reps 總和
-- **WHEN** 某動作在視窗內有三筆紀錄，`reps` 分別為 5、3、1
-- **THEN** 組數 SHALL 為 3，總次數 SHALL 為 9
-
-#### Scenario: 視窗含今天在內共 14 天
-- **WHEN** 某動作在第 14 天（視窗起點）與第 15 天各有一筆紀錄
-- **THEN** 僅第 14 天那筆 SHALL 計入
-
-#### Scenario: 視窗內未練到
-- **WHEN** 某動作最後一筆紀錄早於視窗起點
-- **THEN** 組數與總次數 SHALL 皆為 0，該動作 SHALL 仍列在結果中
-
-#### Scenario: reps 缺失不使總次數成為 NaN
-- **WHEN** 視窗內某筆紀錄缺少 `reps` 或其值非數字
-- **THEN** 該筆 SHALL 以 0 次計入，總次數 SHALL 為有效數值
-
 ### Requirement: All-Time Max Weight
 每個動作 SHALL 提供**歷來最大重量**：該動作所有紀錄中 `weight` 的最大值。
 
@@ -121,12 +96,14 @@ SHALL NOT 解讀為「整段期間總共只能空一週」。
 - **THEN** 最大重量 SHALL 為 `null`
 
 ### Requirement: Result Shape And Ordering
-每一列 SHALL 包含動作名稱、連續週數、最近 14 天的組數與總次數、歷來最大重量，
+每一列 SHALL 包含動作名稱、連續週數、歷來最大重量，
 以及該動作**實際最後訓練日**（`YYYY-MM-DD`）。
+最近 14 天的組數與總次數 SHALL NOT 出現在本能力的列資料中——
+該數值已改由 `exercise-detail-panel` 提供，兩處各自計算會使同一個視窗有兩份定義。
 最後訓練日 SHALL 為實際有紀錄的日期，SHALL NOT 為該週的週一。
 
-最後訓練日 SHALL 用於排序，但 SHALL NOT 顯示於表格——四欄（動作、近2週、
-最重、持續）已是手機版面可容納的上限，而持續週數已隱含近期性。
+最後訓練日 SHALL 用於排序，但 SHALL NOT 顯示於表格——持續週數已隱含近期性，
+而表格的欄位數受 Exercise Name Legibility 約束。
 
 結果 SHALL 以**最後訓練日由新到舊**為主要排序，使最近訓練過的動作優先呈現；
 最後訓練日相同時 SHALL 依連續週數由大到小；兩者皆相同時 SHALL 依動作名稱字典序升冪，
@@ -174,15 +151,40 @@ SHALL NOT 解讀為「整段期間總共只能空一週」。
 - **WHEN** 資料中有 14 個動作，各自的最後訓練日互不相同
 - **THEN** SHALL 回傳最後訓練日最新的 12 列
 
+### Requirement: Exercise Name Legibility
+動作名稱 SHALL 在手機寬度下完整顯示，SHALL NOT 被截斷到無法辨識是哪個動作。
+
+動作名稱欄 SHALL 為表格中唯一的彈性欄（吃剩餘寬度），其餘欄位 SHALL 為固定寬度。
+欄位總數 SHALL 以「動作名稱欄在 375pt 裝置上仍能容納目前資料中最長的動作名稱」為上限。
+新增欄位前 SHALL 先確認此條件仍成立；不成立時 SHALL 移除既有欄位或改由詳細面板承載，
+SHALL NOT 讓動作名稱欄吸收差額——它是唯一的彈性欄，任何新欄位的寬度都由它支付。
+
+本能力 SHALL NOT 以寬度斷點（`@media (max-width: …)`）分歧排版。
+本應用為 LIFF app，手機是主要形態而非特例；同一張表維護兩套欄位定義會使
+兩份定義各自漂移，而三欄在 375pt 下已足夠。
+
+備註（記錄查證結果，非正規需求）：2026-09-18 實測，375pt 下表格可用寬度為 303px。
+五欄時動作名稱欄僅剩約 101px，而資料中的 `Barbell Overhead Press` 需要約 150px，
+畫面上顯示為 `Barbell Overh…`，與 `Dumbbell Bench Press` 截斷後難以區分。
+改為三欄後動作名稱欄為 159px。
+
+#### Scenario: 最長的動作名稱完整顯示
+- **WHEN** 於 375pt 寬度顯示 `Barbell Overhead Press`
+- **THEN** 該名稱 SHALL 完整顯示，SHALL NOT 被截斷
+
+#### Scenario: 不以寬度斷點分歧排版
+- **WHEN** 視窗寬度改變
+- **THEN** 表格 SHALL 維持同一組欄位定義，SHALL NOT 依寬度切換為另一套欄位
+
+#### Scenario: 新增欄位須先確認動作名稱仍放得下
+- **WHEN** 有人想在表格新增一欄
+- **THEN** SHALL 先確認動作名稱欄在 375pt 下仍容納得下最長的動作名稱，
+  否則 SHALL 移除既有欄位或改由詳細面板承載
+
 ### Requirement: Presentation Without Alerting
 本能力 SHALL 僅呈現資訊，SHALL NOT 發出通知、警報或需要使用者採取行動的提示。
 
-表格 SHALL 為四欄，欄標題依序為：**動作**、**近2週**（組數與總次數合併顯示）、
-**最重**、**持續週數**。近 2 週無紀錄時該欄 SHALL 顯示破折號而非「0組·0次」——
-前者表示「這段期間沒碰」，後者會被誤讀為練了但沒記到數字。
-
-「近2週」的欄標題 SHALL 承擔視窗長度的說明——格子內容本身已寫明「組」與「次」，
-標題 SHALL NOT 重複它。
+表格 SHALL 為三欄，欄標題依序為：**動作**、**最重**、**持續週數**。
 
 持續週數的欄標題 SHALL 為「持續週數」：**SHALL NOT 省略單位**——
 該欄的格子只有一個裸數字，沒有單位就無從判斷是週還是天。

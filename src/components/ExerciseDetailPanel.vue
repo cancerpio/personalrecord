@@ -98,6 +98,14 @@ function slashDate(iso) {
   return iso.slice(5).replace('-', '/');
 }
 
+// 視窗內的總組數與總次數。原本是總覽表的「近2週」欄，#27 把它讓給動作名稱後搬來這裡。
+// 視窗內無紀錄時不顯示——那種情況由下方「近 14 天未練 · 上次 MM-DD」回答，
+// 比「0組·0次」清楚（後者會被讀成練了但沒記到數字）。
+const recentTotalText = computed(() =>
+  recentDetail.value.days.length > 0
+    ? `${recentDetail.value.totalSets}組·${recentDetail.value.totalReps}次`
+    : '');
+
 // 45×8 ×4：後面那個數字是「同樣的重量次數做了幾組」，只有多組時才顯示。
 function groupText(group) {
   const base = `${group.weight}×${group.reps}`;
@@ -151,7 +159,9 @@ onMounted(() => {
 
     <!-- 近 14 天明細 -->
     <div class="recent-block">
-      <div class="recent-head">近 14 天</div>
+      <div class="recent-head">
+        近 14 天<template v-if="recentTotalText"> · {{ recentTotalText }}</template>
+      </div>
 
       <div v-if="recentDetail.days.length > 0" class="day-list">
         <div v-for="day in recentDetail.days" :key="day.date" class="day">

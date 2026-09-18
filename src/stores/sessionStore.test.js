@@ -680,7 +680,7 @@ describe('exerciseOverview — 最近動作總覽', () => {
     ];
     expect(store.exerciseOverview).toEqual([
       // 視窗起點 2026-08-12，故 08-17 與 08-24 兩筆計入；08-10 不計
-      { exercise: 'Squat', streakWeeks: 3, recentSets: 2, recentReps: 10, maxWeight: 100, lastDate: '2026-08-24' },
+      { exercise: 'Squat', streakWeeks: 3, maxWeight: 100, lastDate: '2026-08-24' },
     ]);
   });
 
@@ -737,7 +737,7 @@ describe('exerciseOverview — 最近動作總覽', () => {
     ];
     // 舊語意會回傳 5（歷史上的連續）；新語意問的是「現在還持續著嗎」
     expect(store.exerciseOverview).toEqual([
-      { exercise: 'Pull Up', streakWeeks: 0, recentSets: 0, recentReps: 0, maxWeight: 100, lastDate: '2026-06-29' },
+      { exercise: 'Pull Up', streakWeeks: 0, maxWeight: 100, lastDate: '2026-06-29' },
     ]);
   });
 
@@ -844,36 +844,13 @@ describe('exerciseOverview — 最近動作總覽', () => {
       s('2026-08-24', 'Bench Press'),
     ];
     expect(store.exerciseOverview).toEqual([
-      { exercise: 'Bench Press', streakWeeks: 1, recentSets: 1, recentReps: 5, maxWeight: 100, lastDate: '2026-08-24' },
+      { exercise: 'Bench Press', streakWeeks: 1, maxWeight: 100, lastDate: '2026-08-24' },
     ]);
   });
-  // ---- 最近 14 天的組數／總次數，以及歷來最大重量 ----
-  // 當天固定為 2026-08-25，視窗＝含今天往回 14 天，起點為 2026-08-12。
+  // ---- 歷來最大重量 ----
+  // 近 14 天的組數／總次數已於 #27 移出本表，改由 getExerciseRecentDetail 提供。
 
-  it('組數為視窗內的紀錄筆數，總次數為 reps 總和', () => {
-    const store = useSessionStore();
-    store.sessions = [
-      { id: 'a', date: '2026-08-24', exercise: 'Squat', weight: 100, reps: 5 },
-      { id: 'b', date: '2026-08-24', exercise: 'Squat', weight: 105, reps: 3 },
-      { id: 'c', date: '2026-08-20', exercise: 'Squat', weight: 110, reps: 1 },
-    ];
-    const row = store.exerciseOverview[0];
-    expect(row.recentSets).toBe(3);
-    expect(row.recentReps).toBe(9);
-  });
-
-  it('視窗含今天在內共 14 天：第 14 天算在內，第 15 天不算', () => {
-    const store = useSessionStore();
-    store.sessions = [
-      { id: 'in', date: '2026-08-12', exercise: 'Squat', weight: 100, reps: 5 },  // 視窗起點
-      { id: 'out', date: '2026-08-11', exercise: 'Squat', weight: 100, reps: 7 }, // 早一天
-    ];
-    const row = store.exerciseOverview[0];
-    expect(row.recentSets).toBe(1);
-    expect(row.recentReps).toBe(5);
-  });
-
-  it('最大重量掃全部歷史，不受 14 天視窗限制', () => {
+  it('最大重量掃全部歷史，不受任何時間視窗限制', () => {
     const store = useSessionStore();
     store.sessions = [
       { id: 'old', date: '2026-03-01', exercise: 'Squat', weight: 160, reps: 1 }, // 視窗外
@@ -882,12 +859,10 @@ describe('exerciseOverview — 最近動作總覽', () => {
     expect(store.exerciseOverview[0].maxWeight).toBe(160);
   });
 
-  it('14 天內沒練的動作組數與總次數為 0，但仍列在清單上', () => {
+  it('久沒練的動作仍列在清單上，且保有其最大重量', () => {
     const store = useSessionStore();
     store.sessions = [s('2026-08-24', 'Squat'), s('2026-06-01', 'Pull Up')];
     const pullUp = store.exerciseOverview.find(r => r.exercise === 'Pull Up');
-    expect(pullUp.recentSets).toBe(0);
-    expect(pullUp.recentReps).toBe(0);
     expect(pullUp.maxWeight).toBe(100);
   });
 
@@ -907,18 +882,6 @@ describe('exerciseOverview — 最近動作總覽', () => {
       { id: 'a', date: '2026-08-24', exercise: 'Squat', reps: 5 },
     ];
     expect(store.exerciseOverview[0].maxWeight).toBeNull();
-  });
-
-  it('reps 缺失或非數字時以 0 計入，總次數不得為 NaN', () => {
-    const store = useSessionStore();
-    store.sessions = [
-      { id: 'a', date: '2026-08-24', exercise: 'Squat', weight: 100, reps: 5 },
-      { id: 'b', date: '2026-08-23', exercise: 'Squat', weight: 100 },
-      { id: 'c', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 'x' },
-    ];
-    const row = store.exerciseOverview[0];
-    expect(row.recentSets).toBe(3);
-    expect(row.recentReps).toBe(5);
   });
 });
 
@@ -1100,10 +1063,56 @@ describe('getExerciseRecentDetail — 近 14 天每日明細（#26）', () => {
     expect(store.getExerciseRecentDetail('Squat').lastBefore).toBeNull();
   });
 
+  // ---- 14 天視窗的總組數與總次數（#27：由總覽表的「近2週」欄搬過來）----
+  // 視窗與每日明細共用，不另外計算。
+
+  it('總組數為視窗內的紀錄筆數，總次數為 reps 總和', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-24', 100, 5),
+      s('2026-08-24', 105, 3),
+      s('2026-08-20', 110, 1),
+    ];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.totalSets).toBe(3);
+    expect(d.totalReps).toBe(9);
+  });
+
+  it('視窗外的紀錄不計入總計', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      s('2026-08-12', 100, 5),  // 視窗起點，算在內
+      s('2026-08-11', 100, 7),  // 早一天，不算
+    ];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.totalSets).toBe(1);
+    expect(d.totalReps).toBe(5);
+  });
+
+  it('reps 缺失或非數字時以 0 計入，總次數不得為 NaN', () => {
+    const store = useSessionStore();
+    store.sessions = [
+      { id: 'a', date: '2026-08-24', exercise: 'Squat', weight: 100, reps: 5 },
+      { id: 'b', date: '2026-08-23', exercise: 'Squat', weight: 100 },
+      { id: 'c', date: '2026-08-22', exercise: 'Squat', weight: 100, reps: 'x' },
+    ];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.totalSets).toBe(3);
+    expect(d.totalReps).toBe(5);
+  });
+
+  it('視窗內無紀錄時總計為 0 而非 undefined', () => {
+    const store = useSessionStore();
+    store.sessions = [s('2026-07-20', 50, 5)];
+    const d = store.getExerciseRecentDetail('Squat');
+    expect(d.totalSets).toBe(0);
+    expect(d.totalReps).toBe(0);
+  });
+
   it('完全沒有該動作的紀錄時 days 為空且 lastBefore 為 null', () => {
     const store = useSessionStore();
     store.sessions = [s('2026-08-24', 100, 5, 'Deadlift')];
-    expect(store.getExerciseRecentDetail('Squat')).toEqual({ days: [], lastBefore: null });
+    expect(store.getExerciseRecentDetail('Squat')).toEqual({ days: [], totalSets: 0, totalReps: 0, lastBefore: null });
   });
 });
 

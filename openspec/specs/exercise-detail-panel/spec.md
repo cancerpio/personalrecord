@@ -155,7 +155,7 @@ RM 指的是紀錄，而此圖是趨勢；沿用 RM 命名會使整張圖被讀�
 面板 SHALL 顯示該動作在**含今天在內往回 14 天**的滾動視窗內，每個訓練日的明細：
 日期、組數、當日容積，以及當日實際的重量×次數組合。
 
-視窗長度 SHALL 與總覽表的「最近 14 天」一致。
+視窗長度 SHALL 為 14 天，與 Recent Training Volume Total 共用同一個視窗。
 
 同一天內 `weight` 與 `reps` 皆相同的多筆紀錄 SHALL 合併為一組並標示筆數。
 一筆紀錄 SHALL 計為一組。容積 SHALL 為 `reps × weight` 的總和，
@@ -180,6 +180,34 @@ RM 指的是紀錄，而此圖是趨勢；沿用 RM 命名會使整張圖被讀�
 #### Scenario: reps 缺失不使容積成為 NaN
 - **WHEN** 視窗內某筆紀錄缺少 `reps`
 - **THEN** 該筆 SHALL 以 0 計入容積，當日容積 SHALL 為有效數值
+
+### Requirement: Recent Training Volume Total
+面板 SHALL 顯示 14 天視窗內的**總組數**與**總次數**。位置 SHALL 為「近 14 天」
+區塊的標題行——它是該區塊的摘要，SHALL NOT 另立區塊。
+
+一筆紀錄 SHALL 計為一組；總次數 SHALL 為視窗內所有紀錄 `reps` 的總和。
+`reps` 缺失或非數字時 SHALL 以 0 計入該筆，SHALL NOT 使總和成為 `NaN`。
+視窗 SHALL 與 Recent Training Detail 為同一個，SHALL NOT 各自計算——
+同一個視窗有兩份計算就會有兩個答案。
+
+視窗內沒有任何紀錄時 SHALL NOT 顯示總計。該情況由 Empty Window Fallback
+以「近 14 天未練 · 上次 MM-DD」承擔，比「0組·0次」講得更清楚：
+後者會被誤讀為練了但沒記到數字。
+
+（本需求原屬 `exercise-streak-overview` 的表格欄位「近2週」，2026-09-18 因手機上的
+欄位預算移至本能力——總覽表必須讓出寬度給動作名稱。視窗定義與計算規則未變。）
+
+#### Scenario: 總組數為筆數，總次數為 reps 總和
+- **WHEN** 某動作在視窗內有三筆紀錄，`reps` 分別為 5、3、1
+- **THEN** 總組數 SHALL 為 3，總次數 SHALL 為 9
+
+#### Scenario: reps 缺失不使總次數成為 NaN
+- **WHEN** 視窗內某筆紀錄缺少 `reps` 或其值非數字
+- **THEN** 該筆 SHALL 以 0 次計入，總次數 SHALL 為有效數值
+
+#### Scenario: 視窗內無紀錄時不顯示總計
+- **WHEN** 某動作在 14 天視窗內沒有任何紀錄
+- **THEN** SHALL NOT 顯示總計，SHALL 依 Empty Window Fallback 顯示上次訓練
 
 ### Requirement: Empty Window Fallback
 14 天視窗內沒有任何紀錄時，面板 SHALL 顯示「近 14 天未練」並附上**最後一次**訓練的
