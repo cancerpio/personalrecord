@@ -263,12 +263,9 @@ export const useSessionStore = defineStore('session', {
         // 會分成兩行，讓名稱分岔問題直接顯示在畫面上，而不是靜靜地壞在背後。
         exerciseOverview: (state) => {
             const MAX_ROWS = 12;
-            // 「最近」＝含今天在內往回 14 天。
-            const RECENT_WINDOW_DAYS = 14;
 
             const todayStr = todayLocalISO();
             const currentMonday = getMondayOfDate(todayStr);
-            const recentStart = shiftDays(todayStr, -(RECENT_WINDOW_DAYS - 1));
 
             const byExercise = {};
             state.sessions.forEach(session => {
@@ -278,8 +275,6 @@ export const useSessionStore = defineStore('session', {
                     entry = byExercise[session.exercise] = {
                         weeks: new Set(),
                         lastDate: session.date,
-                        recentSets: 0,
-                        recentReps: 0,
                         maxWeight: null,
                     };
                 }
@@ -296,24 +291,14 @@ export const useSessionStore = defineStore('session', {
                 if (hasWeight && (entry.maxWeight === null || weight > entry.maxWeight)) {
                     entry.maxWeight = weight;
                 }
-
-                // 組數與總次數只看視窗內。一筆紀錄＝一組。
-                // reps 缺失或非數字以 0 計入，避免總和變成 NaN 汙染整欄。
-                if (session.date >= recentStart) {
-                    entry.recentSets += 1;
-                    const reps = Number(session.reps);
-                    entry.recentReps += Number.isNaN(reps) ? 0 : reps;
-                }
             });
 
             return Object.keys(byExercise)
                 .map(exercise => {
-                    const { weeks, lastDate, recentSets, recentReps, maxWeight } = byExercise[exercise];
+                    const { weeks, lastDate, maxWeight } = byExercise[exercise];
                     return {
                         exercise,
                         streakWeeks: computeStreakWeeks(weeks, currentMonday),
-                        recentSets,
-                        recentReps,
                         maxWeight,
                         lastDate,
                     };
@@ -397,15 +382,23 @@ export const useSessionStore = defineStore('session', {
 
             const inWindow = mine.filter(s => s.date >= windowStart);
             if (inWindow.length > 0) {
-                return { days: buildDailyDetail(inWindow), lastBefore: null };
+                // 總計與每日明細取自同一份 inWindow——同一個視窗若各算各的就會有兩個答案。
+                // 一筆紀錄算一組；reps 缺失或非數字以 0 計，避免總次數變成 NaN。
+                const totalReps = inWindow.reduce((sum, s) => sum + (Number(s.reps) || 0), 0);
+                return {
+                    days: buildDailyDetail(inWindow),
+                    totalSets: inWindow.length,
+                    totalReps,
+                    lastBefore: null,
+                };
             }
 
             let lastDate = null;
             mine.forEach(s => { if (lastDate === null || s.date > lastDate) lastDate = s.date; });
-            if (lastDate === null) return { days: [], lastBefore: null };
+            if (lastDate === null) return { days: [], totalSets: 0, totalReps: 0, lastBefore: null };
 
             const lastDay = buildDailyDetail(mine.filter(s => s.date === lastDate))[0];
-            return { days: [], lastBefore: lastDay };
+            return { days: [], totalSets: 0, totalReps: 0, lastBefore: lastDay };
         },
 
         // Weekly training volume calculation and trend
