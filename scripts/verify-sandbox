@@ -27,12 +27,22 @@ echo "-- sudo --"
 chk "不能用 sudo 做任意事"                     fail  sudo -n whoami
 chk "不能帶參數執行防火牆腳本"                  fail  sudo -n /usr/local/share/init-firewall.sh /tmp/evil.txt
 
-echo "-- 控制面檔案唯讀 --"
-for f in .devcontainer/devcontainer.json AGENTS.md CLAUDE.md .git/config; do
+echo "-- 控制面唯讀 --"
+# 目錄 mount 是穩的；單一檔案的 mount 會因 git 的 lock+rename（換 inode）靜默脫鉤，
+# 所以 AGENTS.md / .mcp.json 這兩項若 FAIL，修法是重建容器（見 docs/agent-sandbox.md）。
+for d in .devcontainer .claude .git/hooks; do
+  [ -d "$d" ] || { echo "  SKIP  $d 不存在"; continue; }
+  chk "$d/ 不可寫"                            fail  bash -c "touch '$d/_probe'"
+  rm -f "$d/_probe" 2>/dev/null || true
+done
+for f in AGENTS.md .mcp.json; do
   [ -e "$f" ] || { echo "  SKIP  $f 不存在"; continue; }
   chk "$f 不可寫"                             fail  bash -c "printf '' >> '$f'"
 done
-[ -d .git/hooks ] && { chk ".git/hooks 不可寫" fail bash -c "touch .git/hooks/_probe"; rm -f .git/hooks/_probe 2>/dev/null; }
+# .git/config 刻意不用唯讀 mount（單檔不可靠，且會擋掉 worktree add）。
+# 改成直接檢查它有沒有被動過：core.hooksPath 能把 hooks 導向可寫目錄，
+# 繞過上面 .git/hooks 的唯讀保護。
+chk "core.hooksPath 未被設定"                 fail  git config --get core.hooksPath
 
 echo "-- git 仍可正常工作 --"
 chk "git identity 已設定"                     ok    git config --get user.email

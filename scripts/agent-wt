@@ -1,187 +1,84 @@
 #!/usr/bin/env bash
-# agent-wt：在沙箱內用 git worktree + tmux 平行跑多個 agent
+# agent-wt new <name> [claude|codex] [prompt|@file]
 #
-#   agent-wt new  <name> [claude|codex] [prompt|@file]   建 worktree + 分支 agent/<name>，在 tmux 開一個 agent
-#   agent-wt ls                                          列出 worktree 與 tmux 視窗
-#   agent-wt diff <name>                                 看 agent/<name> 相對 base 的變更
-#   agent-wt attach                                      進入 tmux session
-#   agent-wt rm   <name> [--force]                       關 agent、移除 worktree（分支保留）
+#   建 worktree（分支 agent/<name>）→ 裝依賴 → 配一個不重複的 PORT → 在 tmux 開一個視窗。
+#   為什麼要 worktree：沒有的話 agent 和你共用同一個 checkout，它一切分支你編輯器裡的
+#   檔案就整批被換掉。
 #
-# 環境變數：
-#   BASE=<ref>        新分支起點（預設目前分支）
-#   SESSION=<name>    tmux session 名稱（預設 agents）
-#   CLAUDE_CMD / CODEX_CMD  覆寫 agent 啟動指令
+# 只有 new。列出 / 看 diff / 移除都用原生 git，本來就各是一行：
+#   git worktree list
+#   git diff main...agent/<name>
+#   git worktree remove .worktrees/<name> && git branch -d agent/<name>
 set -euo pipefail
 
-SESSION="${SESSION:-agents}"
-SP_DIR="/opt/superpowers"
+[ "${1:-}" = new ] || { sed -n '2,12p' "$0"; exit 1; }
+name="${2:?用法: agent-wt new <name> [claude|codex] [prompt|@file]}"
+agent="${3:-claude}"
+prompt="${4:-}"
 
-die() { echo "agent-wt: $*" >&2; exit 1; }
-
-# 防火牆守衛：沒有防火牆就不要放 agent 出去（與 shell 的 cc/cx 同一道）
-guard() {
-  [ -f /run/firewall-ok ] && return 0
-  [ "${ALLOW_NO_FIREWALL:-0}" = "1" ] && return 0
-  die "防火牆未就緒，拒絕啟動 agent。檢查：sudo /usr/local/share/init-firewall.sh"
-}
+[[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "name 只能用英數與 . _ -" >&2; exit 1; }
+case "$agent" in claude) cmd=cc ;; codex) cmd=cx ;; *) echo "agent 只能是 claude 或 codex" >&2; exit 1 ;; esac
 
 # 不論在主目錄或某個 worktree 裡執行，都找回主 repo
-COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || die "不在 git repo 內"
-ROOT="$(dirname "$COMMON_DIR")"
-WT_DIR="$ROOT/.worktrees"
-REPO_NAME="$(basename "$ROOT")"
+ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+path="$ROOT/.worktrees/$name"
+[ -e "$path" ] && { echo "$path 已存在" >&2; exit 1; }
 
-ensure_excludes() {
-  local ex="$COMMON_DIR/info/exclude"
-  mkdir -p "$(dirname "$ex")"; touch "$ex"
-  for p in ".worktrees/" ".agent.env" ".agent/"; do
-    grep -qxF "$p" "$ex" || echo "$p" >> "$ex"
-  done
-}
+# @file 形式的 prompt
+if [ "${prompt:0:1}" = "@" ]; then
+  f="${prompt:1}"; [ -f "$f" ] || f="$ROOT/${prompt:1}"
+  [ -f "$f" ] || { echo "找不到 prompt 檔：${prompt:1}" >&2; exit 1; }
+  prompt="$(cat "$f")"
+fi
 
-port_for() {  # 依名稱算出固定 port，避免平行 agent 搶 port
-  local h; h=$(printf %s "$1" | cksum | cut -d' ' -f1)
-  echo $(( 3100 + (h % 80) * 10 ))
-}
+# 用 .git/info/exclude 而不是 .gitignore，不污染版控
+ex="$ROOT/.git/info/exclude"; mkdir -p "$(dirname "$ex")"; touch "$ex"
+for p in ".worktrees/" ".agent/"; do grep -qxF "$p" "$ex" || echo "$p" >> "$ex"; done
 
-launch() {  # $1=name $2=path $3=agent $4=prompt
-  local name="$1" path="$2" agent="$3" prompt="${4:-}" base
-  case "$agent" in
-    claude) base="${CLAUDE_CMD:-claude --dangerously-skip-permissions}" ;;
-    codex)  base="${CODEX_CMD:-codex --dangerously-bypass-approvals-and-sandbox}" ;;
-    *) die "未知 agent：$agent（claude|codex）" ;;
-  esac
-
-  # 規則與 prompt 都不走命令列。
-  # 舊版把整份 AGENTS.md 用 printf %q 內嵌、外層再 %q 一次，中文每個字會展開成
-  # 多個八進位跳脫，長度爆增後撞上 tmux 的 "command too long"。
-  # 改成產生一支 runner 腳本，內容在腳本裡才展開，tmux 只拿到一個路徑。
-  mkdir -p "$path/.agent"
-  [ -n "$prompt" ] && printf '%s' "$prompt" > "$path/.agent/prompt.txt"
-
-  local runner="$path/.agent/run.sh"
-  {
-    echo '#!/usr/bin/env bash'
-    echo 'set -u'
-    echo '[ -f .agent.env ] && { set -a; . ./.agent.env; set +a; }'
-    echo 'args=()'
-    if [ "$agent" = claude ]; then
-      [ -d "$SP_DIR/.claude-plugin" ] &&
-        printf 'args+=(--plugin-dir %s)\n' "$(printf %q "$SP_DIR")"
-      # 規則來源固定是主 repo 根目錄那份（容器內唯讀掛載），
-      # 不是 worktree 裡那份可寫的 checkout——否則 agent 改得動自己的規則。
-      [ -r "$ROOT/AGENTS.md" ] &&
-        printf 'args+=(--append-system-prompt "$(cat %s)")\n' "$(printf %q "$ROOT/AGENTS.md")"
-    fi
-    [ -n "$prompt" ] && echo 'args+=("$(cat .agent/prompt.txt)")'
-    printf '%s "${args[@]}"\n' "$base"
-    echo 'exec bash'
-  } > "$runner"
-  chmod +x "$runner"
-
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
-    tmux new-window -t "$SESSION" -n "$name" -c "$path" "$runner"
-  else
-    tmux new-session -d -s "$SESSION" -n "$name" -c "$path" "$runner"
-  fi
-  echo "agent-wt: [$agent] 已在 tmux $SESSION:$name 啟動 → agent-wt attach"
-}
-
-cmd_new() {
-  guard
-  local name="${1:?用法: agent-wt new <name> [claude|codex] [prompt|@file]}"
-  local agent="${2:-claude}" prompt="${3:-}"
-  [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "name 只能用英數 . _ -"
-  local path="$WT_DIR/$name" branch="agent/$name"
-  local base="${BASE:-$(git -C "$ROOT" symbolic-ref --short HEAD)}"
-  [ -e "$path" ] && die "$path 已存在"
-
-  if [ "${prompt:0:1}" = "@" ]; then
-    local f="${prompt:1}"; [ -f "$f" ] || f="$ROOT/$f"
-    [ -f "$f" ] || die "找不到 prompt 檔：${prompt:1}"
-    prompt="$(cat "$f")"
-  fi
-
-  ensure_excludes
-  mkdir -p "$WT_DIR"
-
-  # 偵測 --relative-paths 支援。這裡有兩個踩過的坑，改動前先讀完：
-  #   1. 不要 grep 字面上的 "--relative-paths"。git 的 help 印的是
-  #      "--[no-]relative-paths"，那個子字串在任何版本都不存在。
-  #   2. 不要用 pipeline。本腳本開頭是 set -euo pipefail，而 `git worktree add -h`
-  #      的離開碼是 129（usage），pipefail 會讓整條 pipeline 回傳 129，
-  #      條件因此永遠成立、一律 fallback 成絕對路徑。
-  # v1/v2 兩個 bug 都有，等於相對路徑 worktree 從來沒生效過。
-  local rel="--relative-paths" help
-  help="$(git worktree add -h 2>&1 || true)"
-  case "$help" in
-    *relative-paths*) ;;
-    *) echo "agent-wt: WARN git < 2.48，改用絕對路徑（主機端 git 將無法操作此 worktree）" >&2
-       rel="" ;;
-  esac
-  # worktree add 失敗時分支仍會被建出來（實測確認），留下孤兒分支會讓同名重試
-  # 撞上 "branch already exists"，所以失敗要自己收尾。
-  if ! git -C "$ROOT" worktree add $rel -b "$branch" "$path" "$base"; then
-    git -C "$ROOT" branch -D "$branch" 2>/dev/null || true
-    die "worktree add 失敗（已清掉分支 $branch）。若訊息是 could not write config file，
-     表示這個 repo 還沒 bootstrap，請在主機執行：
-       git worktree add --relative-paths -b _bootstrap .worktrees/_bootstrap
-       git worktree remove .worktrees/_bootstrap && git branch -d _bootstrap"
-  fi
-
-  local port; port=$(port_for "$name")
-  cat > "$path/.agent.env" <<EOF
-AGENT_NAME=$name
-PORT=$port
-COMPOSE_PROJECT_NAME=${REPO_NAME}-${name}
-GIT_AUTHOR_NAME=agent-$name
-GIT_COMMITTER_NAME=agent-$name
-EOF
-  mkdir -p "$path/.agent"
-
-  if [ -x "$ROOT/.worktree-setup.sh" ]; then
-    echo "agent-wt: 執行 .worktree-setup.sh"
-    (cd "$path" && set -a && . ./.agent.env && set +a && "$ROOT/.worktree-setup.sh")
-  fi
-
-  echo "agent-wt: worktree=$path branch=$branch base=$base PORT=$port"
-  launch "$name" "$path" "$agent" "$prompt"
-}
-
-cmd_ls() {
-  git -C "$ROOT" worktree list
-  echo
-  tmux list-windows -t "$SESSION" -F '#{window_name}  #{pane_current_path}' 2>/dev/null \
-    || echo "(沒有 tmux session $SESSION)"
-}
-
-cmd_diff() {
-  local name="${1:?用法: agent-wt diff <name>}"
-  local base="${BASE:-$(git -C "$ROOT" symbolic-ref --short HEAD)}"
-  git -C "$ROOT" diff --stat "$base...agent/$name"
-  echo; echo "完整 diff：git diff $base...agent/$name"
-  if [ -s "$WT_DIR/$name/.agent/QUESTIONS.md" ]; then
-    echo; echo "== agent 留下的商業邏輯問題 =="; cat "$WT_DIR/$name/.agent/QUESTIONS.md"
-  fi
-  return 0
-}
-
-cmd_rm() {
-  local name="${1:?用法: agent-wt rm <name> [--force]}" force="${2:-}"
-  tmux kill-window -t "$SESSION:$name" 2>/dev/null || true
-  if [ "$force" = "--force" ]; then
-    git -C "$ROOT" worktree remove --force "$WT_DIR/$name"
-  else
-    git -C "$ROOT" worktree remove "$WT_DIR/$name"
-  fi
-  echo "agent-wt: 已移除 worktree，分支 agent/$name 保留（merge 後可 git branch -d agent/$name）"
-}
-
-case "${1:-}" in
-  new)    shift; cmd_new "$@" ;;
-  ls)     cmd_ls ;;
-  diff)   shift; cmd_diff "$@" ;;
-  attach) exec tmux attach -t "$SESSION" ;;
-  rm)     shift; cmd_rm "$@" ;;
-  *) sed -n '2,15p' "$0"; exit 1 ;;
+# 偵測 --relative-paths。這裡有兩個踩過的坑，改動前先讀完：
+#   1. 別 grep 字面上的 "--relative-paths"。help 印的是 "--[no-]relative-paths"，
+#      那個子字串在任何 git 版本都不存在。
+#   2. 別用 pipeline。本檔開頭是 set -o pipefail，而 `git worktree add -h` 的離開碼
+#      是 129（usage），pipefail 會讓整條 pipeline 回傳非零，條件因此永遠成立。
+# 兩個任一個成立就會靜默 fallback 成絕對路徑，主機端便無法操作這個 worktree。
+rel="--relative-paths"
+case "$(git worktree add -h 2>&1 || true)" in
+  *relative-paths*) ;;
+  *) echo "agent-wt: WARN git < 2.48，改用絕對路徑（主機端將無法操作此 worktree）" >&2
+     rel="" ;;
 esac
+
+# worktree add 失敗時分支仍會被建出來，留著會讓同名重試撞 "already exists"
+if ! git -C "$ROOT" worktree add $rel -b "agent/$name" "$path"; then
+  git -C "$ROOT" branch -D "agent/$name" 2>/dev/null || true
+  echo "agent-wt: worktree add 失敗（已清掉分支 agent/$name）" >&2
+  exit 1
+fi
+
+# 依名稱算出固定且不重複的 PORT，避免兩個 dev server 搶同一個
+port=$(( 3100 + ($(printf %s "$name" | cksum | cut -d' ' -f1) % 80) * 10 ))
+printf 'export PORT=%s\nexport COMPOSE_PROJECT_NAME=%s\n' \
+  "$port" "$(basename "$ROOT")-$name" > "$path/.agent.env"
+
+mkdir -p "$path/.agent"
+( cd "$path" && npm ci --no-audit --no-fund )
+
+# prompt 不走命令列：printf %q 對中文會把每個字展開成多個八進位跳脫，
+# 被 tmux 的命令列再包一層就會撞上 "command too long"。改成寫一支 runner，
+# tmux 只拿到一個路徑，內容在腳本裡才展開。
+[ -n "$prompt" ] && printf '%s' "$prompt" > "$path/.agent/prompt.txt"
+runner="$path/.agent/run.sh"
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -a; . ./.agent.env; set +a'
+  if [ -n "$prompt" ]; then printf '%s "$(cat .agent/prompt.txt)"\n' "$cmd"
+  else printf '%s\n' "$cmd"; fi
+  echo 'exec bash'
+} > "$runner"
+chmod +x "$runner"
+
+tmux new-window -t agents -n "$name" -c "$path" "$runner" 2>/dev/null \
+  || tmux new-session -d -s agents -n "$name" -c "$path" "$runner"
+
+echo "agent-wt: worktree=$path 分支=agent/$name PORT=$port"
+echo "agent-wt: [$agent] 已在 tmux agents:$name 啟動 → tmux attach -t agents"

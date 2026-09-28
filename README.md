@@ -18,22 +18,25 @@ npm run build
 
 ```bash
 # 起容器 + 進去
-npx @devcontainers/cli up   --workspace-folder . --config .devcontainer/devcontainer.json
-npx @devcontainers/cli exec --workspace-folder . --config .devcontainer/devcontainer.json bash
+npx @devcontainers/cli up   --workspace-folder .
+npx @devcontainers/cli exec --workspace-folder . bash
 
 # 容器內
 claude            # 第一次要登入
 codex login       # 第一次要登入
 verify-sandbox    # 每次都要跑！全 PASS 才往下做（單檔唯讀 mount 會靜默脫鉤）
-agent-wt new feat-a claude @prompts/TEMPLATE.md
+cc                # 啟動 Claude（cx = Codex）
+
+# 要平行開多個
+agent-wt new feat-a claude "把 X 改成 Y"
 
 # 回主機收成
-agent-wt diff feat-a && git merge agent/feat-a && agent-wt rm feat-a
+git diff main...agent/feat-a && git merge agent/feat-a
+git worktree remove .worktrees/feat-a && git branch -d agent/feat-a
 ```
 
-首次在**新機器**上使用需要兩個前置步驟（git >= 2.48、superpowers 連結），
-新 repo 需要一次 bootstrap。完整說明、擋得住什麼、已知的洞：
-**[docs/agent-sandbox.md](docs/agent-sandbox.md)**
+新機器需要兩個前置步驟（git >= 2.48、superpowers 連結）。完整說明、擋得住什麼、
+已知的洞：**[docs/agent-sandbox.md](docs/agent-sandbox.md)**
 
 ## GitHub Actions CI/CD Deployment
 

@@ -6,7 +6,7 @@
 > 主機上沒有沙箱邊界，照常套用一般的授權流程。
 
 Codex 原生讀這份 `AGENTS.md`。Claude 這邊**刻意不建立 `CLAUDE.md`**
-（那會讓主機上的 session 也載入這些容器專屬規則），改由容器內的 `cc` 函式
+（那會讓主機上的 session 也載入這些容器專屬規則），改由容器內的 `cc` 指令
 以 `--append-system-prompt` 注入，來源是唯讀掛載的根目錄副本 `$AGENT_RULES`。
 
 這個檔案在容器內是**唯讀掛載**的，agent 改不掉。
@@ -14,13 +14,18 @@ Codex 原生讀這份 `AGENTS.md`。Claude 這邊**刻意不建立 `CLAUDE.md`**
 ## 執行環境
 
 - 你在隔離的容器/沙箱內執行，權限已全開。可以自由安裝套件、執行測試、重構、在當前分支 commit。
-- 你已經在一個專屬的 git worktree 與分支（`agent/<name>`）上。
-  **不要再建立 worktree、不要切換分支、不要 merge、不要 push、不要改寫其他分支的歷史。**
+- **一律不要切換分支、不要 merge、不要 push、不要改寫歷史，也不要自己建 worktree。**
+  你可能在兩種位置之一，而兩種都禁止切分支：
+  - `.worktrees/<name>/`（由 `agent-wt new` 啟動）——你有專屬的分支 `agent/<name>`。
+  - 主工作目錄（直接用 `cc` / `cx` 啟動）——**你和使用者共用同一個 checkout**，
+    切分支會當場改變他編輯器裡的檔案。
+  用 `git rev-parse --show-toplevel` 可以確認自己在哪。
 - 容器內沒有可以推送的憑證，`git push` 會失敗。這是刻意的，不要嘗試繞過。
-- 若 `.agent.env` 存在，啟動任何 server 或 docker compose 前先載入它，一律使用其中的
-  `$PORT` 與 `$COMPOSE_PROJECT_NAME`，避免和其他平行 agent 衝突。server 綁定 `0.0.0.0`。
+- 若 `.agent.env` 存在，啟動任何 server 前先載入它，一律使用其中的 `$PORT` 與
+  `$COMPOSE_PROJECT_NAME`，避免和其他平行 agent 衝突。server 綁定 `0.0.0.0`。
 - 以下路徑唯讀，不要嘗試修改，也不要為了繞過它而改用別的路徑：
-  `.devcontainer/`、`.git/config`、`.git/hooks/`、`AGENTS.md`、`.mcp.json`、`.claude/`。
+  `.devcontainer/`、`.git/hooks/`、`AGENTS.md`、`.mcp.json`、`.claude/`。
+  `.git/config` 雖然可寫，**不要動它**——尤其不要設 `core.hooksPath`。
 - 出站網路走白名單。連不到某個網域時，回報給我，不要自己改防火牆或找替代通道。
 - **Firestore / firebase MCP 在容器內不可用**（沒有給憑證，這是刻意的）。
   需要用正式資料佐證某個判斷時，把要查的問題寫進 `.agent/QUESTIONS.md`，我在主機上查。
@@ -41,7 +46,7 @@ Codex 原生讀這份 `AGENTS.md`。Claude 這邊**刻意不建立 `CLAUDE.md`**
 - 照常使用 superpowers 的流程（TDD、systematic debugging、verification-before-completion、
   code review 等）。
 - brainstorming / 需求釐清階段：只針對**商業邏輯**提問，技術設計自行決定並寫進計畫文件。
-- `using-git-worktrees`：**跳過**，你已經在 worktree 裡了。
+- `using-git-worktrees`：**跳過**。worktree 由使用者用 `agent-wt` 決定，不是你的事。
 - `finishing-a-development-branch`：做到「測試全綠 + 已 commit」就停，不要 merge、不要開 PR。
   最後輸出變更摘要與 `.agent/QUESTIONS.md` 內容。
 

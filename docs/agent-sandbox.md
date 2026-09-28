@@ -1,219 +1,174 @@
 # Agent 沙箱（devcontainer）
 
-讓 Claude Code 和 Codex 在隔離的容器裡**全權限執行、不問授權**，並且可以同時開多個
-agent 平行做事。容器是邊界，所以兩個 agent 都以 bypass 模式跑。
+讓 Claude Code 和 Codex 在隔離容器裡**全權限執行、不問授權**，並可用 git worktree
+平行開多個。容器是邊界，所以兩個 agent 都以 bypass 模式跑。
 
-適用對象：**你自己信任的 repo**。不要拿它跑來路不明的程式碼（理由見最後一節）。
+**只用於你自己信任的 repo。** 不可信的第三方程式碼請用 VM 或 cloud session。
 
 ---
 
-## 第一次設定
+## 用法
 
-### 每台機器做一次
+### 每台機器一次
 
 ```bash
-# 1. git 需要 >= 2.48（相對路徑 worktree）
-brew install git && git --version
+brew install git        # 需要 >= 2.48（worktree 相對路徑）
 
-# 2. 讓容器讀得到 superpowers skills（容器內唯讀掛載）
+# 讓容器讀得到 superpowers skills（容器內唯讀掛載）
 mkdir -p ~/.agent-skills
 ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/<版本> \
         ~/.agent-skills/superpowers
 ```
 
-superpowers 升版後那個版本號目錄會換，重跑一次 `ln -sfn` 指到新版即可。
+superpowers 升版後那個版本號目錄會換，重跑一次 `ln -sfn` 指到新版。
 
-### 每個 repo 做一次（bootstrap）
-
-```bash
-git worktree add --relative-paths -b _bootstrap .worktrees/_bootstrap
-git worktree remove .worktrees/_bootstrap && git branch -d _bootstrap
-```
-
-**這一步不能省。** 它會把 `.git/config` 升級成：
-
-```ini
-[core]
-    repositoryformatversion = 1
-[extensions]
-    relativeworktrees = true
-```
-
-容器內 `.git/config` 是唯讀掛載的（防止 agent 用 `core.hooksPath` 繞過 `.git/hooks`
-的保護），所以這個寫入必須在主機先做掉，否則 `agent-wt new` 會失敗於
-`could not write config file .git/config`。
-
-`personalrecord` 已經 bootstrap 過了，不用再做。
-
----
-
-## 每次要用
+### 每次要用
 
 ```bash
-# 1. 起容器（第一次會 build，之後很快）
-npx @devcontainers/cli up   --workspace-folder . --config .devcontainer/devcontainer.json
+# 起容器（第一次會 build，之後幾秒）
+npx @devcontainers/cli up   --workspace-folder .
 
-# 2. 進去
-npx @devcontainers/cli exec --workspace-folder . --config .devcontainer/devcontainer.json bash
+# 進去
+npx @devcontainers/cli exec --workspace-folder . bash
 
-# 3. 容器內第一次要登入（登入狀態存在 volume，rebuild 才需要重登）
-claude          # 瀏覽器回調失敗時，把畫面上的代碼貼回終端機
-codex login
+# 容器內
+claude            # 第一次要登入（瀏覽器回調失敗時把代碼貼回終端機）
+codex login       # 第一次要登入
+verify-sandbox    # 每次都跑，全 PASS 才往下做
 
-# 4. 確認沙箱真的關緊了
-verify-sandbox  # 全部 PASS 才往下做
-
-# 5. 開 agent
-agent-wt new feat-a claude @prompts/feat-a.md
-agent-wt new feat-b codex  @prompts/feat-b.md
-agent-wt attach          # tmux 切視窗：Ctrl-b n / Ctrl-b w
+cc                # 啟動 Claude
+cx                # 啟動 Codex
 ```
 
-也可以不用 worktree，直接在容器內跑 `cc`（Claude）或 `cx`（Codex）。
+`cc` / `cx` 會在防火牆未就緒時拒絕啟動。
 
-## 收成（在主機上做）
+### 平行開多個 agent
 
 ```bash
-agent-wt diff feat-a       # 變更統計 + agent 留下的商業問題
+agent-wt new feat-a claude @docs/some-prompt.md
+agent-wt new feat-b codex  "把 X 重構成 Y"
+tmux attach -t agents        # 切視窗：Ctrl-b n / Ctrl-b w
+```
+
+每個 worktree 有自己的分支 `agent/<name>`、自己的 `node_modules`、
+以及 `.agent.env` 裡一個不重複的 `PORT`。
+
+**為什麼要 worktree**：沒有的話 agent 和你共用同一個 checkout，
+它一切分支你編輯器裡的檔案就整批被換掉。
+
+收成與清理都用原生 git（在主機或容器內都可以）：
+
+```bash
+git worktree list
+git diff main...agent/feat-a
 git merge agent/feat-a
-agent-wt rm feat-a         # 移除 worktree，分支保留
+git worktree remove .worktrees/feat-a && git branch -d agent/feat-a
 git push
 ```
 
 ---
 
-## 重要：放 agent 進去之前先 push
+## 放 agent 進去之前先 push
 
-專案目錄在容器內是**可寫的**（設計如此，agent 要能改程式碼），而 `.git` 也在裡面。
-也就是說 agent 有能力砍掉 repo 歷史。`AGENTS.md` 禁止它這樣做，但那是文字約束不是機制。
+專案目錄在容器內是可寫的（agent 要能改程式碼），`.git` 也在裡面。
+`AGENTS.md` 禁止它砍歷史，但那是文字約束不是機制。
 
-**沒 push 的 commit 被砍掉就是沒了。** 先 push 再放 agent 進來，最壞情況就只是重新 clone。
+**沒 push 的 commit 被砍掉就是沒了。** 先 push，最壞情況就只是重新 clone。
 
 ---
 
-## 這個沙箱擋得住什麼
+## 擋得住什麼
 
-| | 狀態 |
+| | |
 |---|---|
 | 誤碰專案外的檔案（`~/.ssh`、其他 repo） | ✅ 容器邊界 |
 | 弄壞開發環境（nvm、全域 CLI） | ✅ 容器邊界 |
-| 一直要按授權 | ✅ 兩個 agent 都 bypass，容器當邊界 |
-| 把東西往外送 | ⚠️ 出站白名單，但**IP 粒度**且**無紀錄** |
-| 改到會在主機執行的檔案 | ✅ `.git/config`、`.git/hooks`、`.devcontainer/`、`AGENTS.md`、`.mcp.json`、`.claude/` 唯讀掛載 |
-| `git push` | ✅ 容器內沒有憑證（沒掛 `~/.ssh`、無 credential helper） |
+| 一直要按授權 | ✅ 兩個 agent 都 bypass |
+| 把東西往外送 | ⚠️ 出站白名單，但 **IP 粒度**且**無紀錄** |
+| 改到會在主機執行的檔案 | ✅ `.devcontainer/`、`.git/hooks/`、`.claude/`、`AGENTS.md`、`.mcp.json` 唯讀 |
+| `git push` | ✅ 容器內沒有憑證 |
+| 關掉防火牆 | ✅ sudo 收斂成只能跑防火牆腳本且不能帶參數 |
+| VS Code IPC 逃逸 | ✅ 走 CLI，容器內沒有編輯器 process |
 | 砍掉 `.git` 歷史 | ❌ 設計如此，靠「先 push」 |
 
 ### 已知的洞
 
-- **單檔唯讀 mount 會脫鉤，而且是靜默的。** 這是最需要注意的一個。
-  `.git/config`、`AGENTS.md`、`.mcp.json` 是**單一檔案**的 bind mount。
-  git（還有很多工具）改檔案的方式是「寫 `.lock` 再 rename 蓋過去」，
-  也就是**換掉一個新的 inode**。一旦主機那側把檔案換掉，容器裡的 mount 就脫鉤，
-  那個檔案**變回可寫**，而且沒有任何錯誤訊息。
+**單檔唯讀 mount 會靜默脫鉤。** `AGENTS.md`、`.mcp.json` 是單一檔案的 bind mount。
+工具改檔案常用「寫 `.lock` 再 rename」，換的是 inode；主機那側一旦換掉檔案，
+容器裡的 mount 就脫鉤、檔案變回可寫，**沒有任何錯誤訊息**。
 
-  實測過：`.git/config` 在一輪操作後就從 mount 清單消失，容器內 append 成功，
-  內容直接寫到主機的檔案上。
+目錄的 mount 沒這問題（實測過），所以 `.git/config` 刻意**不**掛——
+它被 git 頻繁重寫，掛了也留不住，而且會擋掉 `worktree add`。
+它的威脅（`core.hooksPath` 把 hooks 導向可寫目錄）改由 `verify-sandbox` 直接檢查。
 
-  目錄的 bind mount（`.git/hooks`、`.claude/`、`.devcontainer/`）**沒有這個問題**，
-  因為目錄不會被 rename 換掉。
+最常觸發它的情境很日常：**你在主機上編輯 `AGENTS.md` 或 `.mcp.json`，
+它自己的唯讀保護就掉了**（開發這份設定時實測到，一次就中）。
 
-  **所以 `verify-sandbox` 必須每次進容器都跑**，不是只跑第一次。它抓得到這個狀況
-  （`FAIL .git/config 不可寫`）。修法是重建容器：
+**所以 `verify-sandbox` 要每次進容器都跑。** FAIL 的修法是重建容器：
 
-  ```bash
-  docker rm -f $(docker ps -aq --filter label=devcontainer.local_folder=$PWD)
-  npx @devcontainers/cli up --workspace-folder . --config .devcontainer/devcontainer.json
-  ```
+```bash
+docker rm -f $(docker ps -aq --filter label=devcontainer.local_folder=$PWD)
+npx @devcontainers/cli up --workspace-folder .
+```
 
-- **白名單是 IP 粒度。** `init-firewall.sh` 啟動時把網域解析成 IP 放進 ipset，
-  同一個 IP 上的其他網域（SNI 共用）擋不住。
-- **沒有出站紀錄。** 事後查不出 agent 連過哪裡。要補的話在 `init-firewall.sh`
-  最後那條 REJECT 之前加 `-j LOG`。
-- **worktree 裡的 `AGENTS.md` 對 Codex 是可寫的。** Claude 這邊已處理（`cc` 讀的是
-  `$AGENT_RULES`，指向唯讀的根目錄副本），但 Codex 原生從 cwd 讀 `AGENTS.md`，
-  而 worktree 裡那份是可寫的 checkout。
-- **憑證可被讀取。** bypass 模式下，惡意專案可以讀到容器內 `~/.claude`、`~/.codex`
-  的登入憑證並外洩。這是 Anthropic 官方文件明列的限制，也是「只用於信任的 repo」的原因。
+**其他**
+
+- 白名單是 IP 粒度：同一個 IP 上的其他網域（SNI 共用）擋不住。
+- 沒有出站紀錄，事後查不出連過哪裡。要補就在 `init-firewall.sh` 最後那條 REJECT
+  之前加 `-j LOG`。
+- 憑證可被讀取：bypass 模式下惡意專案可讀到容器內 `~/.claude`、`~/.codex` 的登入憑證。
+  這是 Anthropic 官方明列的限制，也是「只用於信任的 repo」的理由。
+- **緊急關閉防火牆**：sudo 已收斂，容器內辦不到。從主機下
+  `docker exec -it -u root <容器> bash`。
 
 ---
 
 ## 這個專案的特定設定
 
-### Firestore / firebase MCP 在容器內不可用
+**Firestore / firebase MCP 在容器內不可用。** `.mcp.json` 裡的 `firebase mcp` 沒有
+憑證也沒裝 CLI，這是刻意的：把正式 Firestore 的讀取權放進全權限 agent 的沙箱，
+正好是「把東西往外送」那條風險。要查資料讓 agent 寫進 `.agent/QUESTIONS.md`，
+你在主機查。
 
-`.mcp.json` 裡的 `firebase mcp --dir backend` 在容器內**不會運作**——沒有安裝
-firebase CLI，也沒有給憑證。這是刻意的：把正式環境的 Firestore 讀取權放進一個
-全權限 agent 的沙箱，正好是「把東西往外送」那條風險。
+**`node_modules` 是 named volume。** 主機是 macOS，`npm install` 裝出來的原生
+binary 是 darwin-arm64，掛進 Linux 容器會炸（`Cannot find module
+'@rolldown/binding-linux-arm64-gnu'`）。`post-create.sh` 會在容器內 `npm ci`
+填充它，主機那份不受影響。升級依賴後要 rebuild container。
 
-要用正式資料佐證判斷時，讓 agent 把問題寫進 `.agent/QUESTIONS.md`，你在主機上查。
+**LIFF 實機測試留在主機。** 需要 HTTPS 對外通道，容器沒設。容器內能做的是
+`npm test` 和 `npm run build`，兩者都不需要對外連線。
 
-### node_modules 是 named volume
+**dev server**：`npm run dev -- --host 0.0.0.0 --port $PORT`（`$PORT` 來自
+`.agent.env`）。`forwardPorts` 開了 5173 給單一 agent 用。
 
-容器內的 `node_modules` 是獨立的 volume，不是主機那份。因為主機是 macOS，
-`npm install` 裝出來的原生 binary 是 darwin-arm64，掛進 Linux 容器會炸：
-
-```
-Cannot find module '@rolldown/binding-linux-arm64-gnu'
-```
-
-`project-setup.sh` 會在容器建立時跑 `npm ci` 填充它。主機那份完全不受影響，
-兩邊可以同時跑。升級依賴後要 rebuild container（或在容器內自己 `npm ci`）。
-
-`agent-wt` 建新 worktree 時會跑 `.worktree-setup.sh`，在那個 worktree 裡也 `npm ci`
-一份（約 3 秒）。
-
-### dev server 與平行 agent
-
-每個 worktree 有自己的 `.agent.env`，裡面是依名稱算出的固定 `PORT`：
-
-```bash
-source .agent.env
-npm run dev -- --host 0.0.0.0 --port $PORT
-```
-
-`forwardPorts` 開了 5173（單一 agent 的預設）。平行跑多個時用各自的 `$PORT`，
-需要從主機看畫面的話另外 forward。
-
-### LIFF 實機測試要在主機做
-
-LINE 的 LIFF 需要 HTTPS 對外通道，容器內沒有設。要用手機實測就在主機跑 dev server。
-容器內能做的是單元測試（`npm test`）與 build（`npm run build`），兩者都不需要對外連線。
-
-### 版本釘死
-
-`.devcontainer/Dockerfile` 裡釘死了兩個 agent 的版本，並關掉自動更新：
-
-```dockerfile
-ARG CLAUDE_VERSION=2.1.283
-ARG CODEX_VERSION=0.158.0
-```
-
-要升版就改這兩行然後 rebuild container。
+**版本釘死**在 `Dockerfile` 的 `CLAUDE_VERSION` / `CODEX_VERSION`，
+搭配 `DISABLE_AUTOUPDATER=1`。升版改那兩行再 rebuild。
 
 ---
 
 ## 檔案
 
-| 路徑 | 作用 |
-|---|---|
-| `.devcontainer/devcontainer.json` | mount、能力、環境變數、生命週期指令 |
-| `.devcontainer/Dockerfile` | base image、工具、兩個 agent（版本釘死） |
-| `.devcontainer/init-firewall.sh` | 出站白名單。**fail-closed**：任何一步失敗就全封鎖 |
-| `.devcontainer/start-firewall.sh` | `postStartCommand` 用，依 `ENABLE_FIREWALL` 決定啟動或跳過 |
-| `.devcontainer/allowed-domains.txt` | 白名單網域（在 image 內，agent 改不到） |
-| `.devcontainer/project-setup.sh` | 本專案專屬：chown `node_modules` volume 並 `npm ci`。**必須跑在 `post-create.sh` 之前**（後者最後會收斂 sudo） |
-| `.devcontainer/post-create.sh` | git identity、superpowers、`cc`/`cx` 函式、**最後收斂 sudo** |
-| `scripts/agent-wt` | worktree + tmux 平行 agent 啟動器 |
-| `scripts/verify-sandbox` | 邊界檢查，每次進容器先跑 |
-| `AGENTS.md` | agent 的行為規則（容器內唯讀） |
-| `.worktree-setup.sh` | 新 worktree 建立後跑 `npm ci` |
+| 路徑 | 行數 | 作用 |
+|---|---|---|
+| `.devcontainer/devcontainer.json` | 86 | mount、能力、環境變數、生命週期 |
+| `.devcontainer/Dockerfile` | 61 | base image、工具、兩個 agent（版本釘死）、`cc`/`cx` |
+| `.devcontainer/init-firewall.sh` | 84 | 出站白名單。**fail-closed**：任何一步失敗就全封鎖 |
+| `.devcontainer/allowed-domains.txt` | 28 | 白名單網域（在 image 內，agent 改不到） |
+| `.devcontainer/post-create.sh` | 45 | git identity、Codex 設定、`npm ci`、**最後收斂 sudo** |
+| `scripts/agent-wt` | 84 | `agent-wt new`：worktree + 依賴 + PORT + tmux |
+| `scripts/verify-sandbox` | 61 | 邊界檢查，21 項 |
+| `AGENTS.md` | 65 | agent 的行為規則（容器內唯讀） |
 
-### 兩個容易誤解的設計
+### 三個容易誤解的設計
 
-**沒有 `CLAUDE.md`。** 如果建了，主機上的 Claude Code session 也會載入 `AGENTS.md`，
-而那份講的是「你在容器內、權限全開」——在主機上是錯的。容器內改由 `cc` 函式以
-`--append-system-prompt` 注入。
+**沒有 `CLAUDE.md`。** 建了的話主機上的 Claude session 也會載入 `AGENTS.md`，
+而那份講的是「你在容器內、權限全開」——在主機上是錯的。容器內改由 `cc` 以
+`--append-system-prompt` 注入，來源是 `$AGENT_RULES`（唯讀的根目錄副本，
+不是 worktree 裡那份可寫的 checkout）。
+
+**`cc` / `cx` 是 image 內的執行檔，不是 shell alias。** 因為 `agent-wt` 產生的
+runner 是非互動 bash，不會 source `/etc/bash.bashrc`，函式放那裡用不到；
+而且烤進 image 後 agent 改不掉。
 
 **sudo 收斂在 `post-create.sh` 而不是 `Dockerfile`。** devcontainer features 疊在
 image 之上、以 root 執行，會把 `NOPASSWD:ALL` 寫回來。所以收斂必須是最後一步。
-收斂後 agent 只能執行防火牆腳本**且不能帶參數**（帶參數就能指向自己寫的全放行清單）。
