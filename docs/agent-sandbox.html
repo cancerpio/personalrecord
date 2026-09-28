@@ -226,6 +226,22 @@ td.num { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monos
   display: flex; flex-direction: column; gap: 0.4rem;
 }
 .callout.danger { border-left-color: var(--fail); }
+.callout.lesson { border-left-color: var(--accent); }
+
+/* 問題 → 解法 的成對區塊 */
+.pair { display: flex; flex-direction: column; gap: 0.35rem; }
+.pair-row { display: grid; grid-template-columns: 4.2rem 1fr; gap: 0.7rem; align-items: baseline; }
+.pair-row > span:first-child {
+  font-family: "IBM Plex Sans Condensed", sans-serif;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); text-align: right;
+}
+.pair-row.fix > span:first-child { color: var(--accent); }
+.pair-row > span:last-child { font-size: 0.93rem; color: var(--ink-soft); }
+@media (max-width: 34rem) {
+  .pair-row { grid-template-columns: 1fr; gap: 0.1rem; }
+  .pair-row > span:first-child { text-align: left; }
+}
 .callout h3 { font-size: 0.95rem; }
 .callout p { font-size: 0.92rem; color: var(--ink-soft); }
 
@@ -505,6 +521,175 @@ footer {
     <strong>緊急關閉防火牆</strong>：sudo 已收斂，容器內辦不到。從主機下
     <code>docker exec -it -u root &lt;容器&gt; bash</code>。
   </p>
+</section>
+
+<!-- ============ 踩過的坑 ============ -->
+<section>
+  <h2>踩過的坑</h2>
+
+  <p>
+    建這套東西時撞到的問題與最後的解法。多數不是設定寫錯，是<strong>主機與容器的環境差異</strong>在某個沒預期的地方冒出來。
+  </p>
+
+  <h3>一、為什麼要掛整個 repo，而不是只掛 worktree</h3>
+
+  <p class="note">
+    直覺上「agent 只該看到它那個 worktree」比較安全，但那樣做 git 完全無法運作，原因有兩層。
+  </p>
+
+  <div class="callout lesson">
+    <div class="pair">
+      <div class="pair-row"><span>第一層</span><span>
+        worktree 目錄裡的 <code>.git</code> 不是目錄，是一行指路文字，指向主 repo 的
+        <code>.git/worktrees/&lt;name&gt;</code>。只掛 worktree 的話這個目標不存在。
+      </span></div>
+      <div class="pair-row"><span>第二層</span><span>
+        <strong>worktree 沒有自己的 object database。</strong> 所有 commit、tree、blob 都存在
+        主 repo 的 <code>.git/objects/</code>。就算想辦法把路徑接通，物件根本不在那裡——
+        這不是路徑問題，是 worktree 的設計就是共用主 repo 的物件庫。
+      </span></div>
+      <div class="pair-row fix"><span>結論</span><span>
+        掛整個 repo 根目錄不是偷懶，是唯一可行的做法。代價是 <code>.git</code> 可寫、
+        agent 有能力砍歷史，所以才有「放 agent 進去之前先 push」這條規則。
+      </span></div>
+    </div>
+  </div>
+
+  <h3>二、worktree 的連結必須是相對路徑</h3>
+
+  <p class="note">
+    主機看到的是 <code>/Users/cancerpio/Project/personalrecord</code>，容器看到的是
+    <code>/workspaces/personalrecord</code>。連結寫絕對路徑，就只有建立它的那一邊能用。
+  </p>
+
+  <div class="term">
+    <div class="term-bar">絕對 vs 相對</div>
+<pre><span class="bad">gitdir: /workspaces/personalrecord/.git/worktrees/feat-a</span>  <span class="cm"># 主機打不開</span>
+<span class="ok">gitdir: ../../.git/worktrees/feat-a</span>                      <span class="cm"># 兩邊都通</span></pre>
+  </div>
+
+  <p class="note">
+    <code>agent-wt</code> 跑在容器內，所以不加 <code>--relative-paths</code> 時斷掉的是<strong>主機</strong>那邊。
+    更麻煩的是主機的 <code>git gc</code> 會順便 <code>worktree prune</code>，看到指不到的路徑就把註冊清掉，
+    反過來也弄壞容器那側。
+  </p>
+
+  <div class="callout lesson">
+    <div class="pair">
+      <div class="pair-row"><span>症狀</span><span>加了 <code>--relative-paths</code> 卻還是絕對路徑，只印一行 WARN</span></div>
+      <div class="pair-row"><span>原因 1</span><span>
+        偵測條件 grep 的是字面 <code>--relative-paths</code>，但 git 的 help 印的是
+        <code>--[no-]relative-paths</code>——那個子字串在任何版本都不存在
+      </span></div>
+      <div class="pair-row"><span>原因 2</span><span>
+        腳本開頭有 <code>set -o pipefail</code>，而 <code>git worktree add -h</code> 的離開碼是
+        <strong>129</strong>（usage），pipeline 因此永遠回傳非零，條件永遠成立
+      </span></div>
+      <div class="pair-row fix"><span>解法</span><span>
+        不用 pipeline，改成 <code>case "$(git worktree add -h 2>&amp;1 || true)" in *relative-paths*)</code>
+      </span></div>
+      <div class="pair-row"><span>教訓</span><span>
+        兩個 bug 疊在一起，各自都足以讓功能失效——而失效時只有一行 WARN，很容易忽略
+      </span></div>
+    </div>
+  </div>
+
+  <h3>三、node_modules 在 macOS 裝、拿到 Linux 容器裡會炸</h3>
+
+  <p class="note">
+    專案目錄是 bind mount，<code>node_modules</code> 預設也跟著進容器。但主機是
+    macOS（darwin-arm64），容器是 Linux（linux-arm64），<strong>原生 binary 不相容</strong>。
+  </p>
+
+  <div class="term">
+    <div class="term-bar"><b>容器</b> · npm test</div>
+<pre><span class="bad">Cannot find module '@rolldown/binding-linux-arm64-gnu'</span>
+<span class="out">Require stack:</span>
+<span class="out">- /workspaces/personalrecord/node_modules/rolldown/dist/shared/binding-….mjs</span></pre>
+  </div>
+
+  <div class="callout lesson">
+    <div class="pair">
+      <div class="pair-row fix"><span>解法</span><span>
+        <code>node_modules</code> 改用 named volume 疊在 bind mount 上，容器有自己的一份，
+        由 <code>post-create.sh</code> 跑 <code>npm ci</code> 填充。主機那份完全不受影響，兩邊可同時跑
+      </span></div>
+      <div class="pair-row"><span>順帶</span><span>
+        named volume 預設 root 擁有，要先 <code>chown</code>——而這必須排在 post-create
+        收斂 sudo <strong>之前</strong>，否則就沒權限了
+      </span></div>
+      <div class="pair-row"><span>副作用</span><span>升級依賴後要 rebuild container，或在容器內自己再 <code>npm ci</code> 一次</span></div>
+    </div>
+  </div>
+
+  <h3>四、其餘的坑</h3>
+
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>症狀</th><th>原因</th><th>解法</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>worktree add</code> 失敗：<br><code>could not write config file .git/config: Resource busy</code></td>
+        <td>首次建相對路徑 worktree 要寫 <code>core.repositoryformatversion=1</code> 與
+            <code>extensions.relativeworktrees</code>，但 <code>.git/config</code> 當時掛成唯讀。
+            錯誤是 EBUSY（rename 蓋不過掛載點），不是權限錯誤</td>
+        <td>拿掉那個唯讀 mount。它本來也留不住（見下一列），而它擋掉的威脅
+            （<code>core.hooksPath</code>）改由 <code>verify-sandbox</code> 直接檢查</td>
+      </tr>
+      <tr>
+        <td>唯讀保護沒有任何錯誤訊息就消失</td>
+        <td>單一檔案的 bind mount，只要主機那側用「寫 <code>.lock</code> 再 rename」換掉檔案
+            （git 與多數編輯器都這樣做），mount 就脫鉤。目錄的 mount 沒這問題</td>
+        <td>只掛目錄；剩下的單檔靠 <code>verify-sandbox</code> 每次偵測，FAIL 就重建容器</td>
+      </tr>
+      <tr>
+        <td>agent 建好 worktree 卻沒啟動，tmux 回
+            <code>command too long</code></td>
+        <td>啟動指令把整份 <code>AGENTS.md</code> 用 <code>printf %q</code> 內嵌命令列，外層再包一次。
+            中文每個字會展開成多個八進位跳脫，長度爆增</td>
+        <td>產生一支 runner 腳本，內容在腳本裡才展開，tmux 只拿到一個路徑</td>
+      </tr>
+      <tr>
+        <td>sudo 收斂寫在 Dockerfile 卻沒效果</td>
+        <td>devcontainer features 疊在 image 之上、以 root 執行，
+            <code>common-utils</code> 之類會把 <code>NOPASSWD:ALL</code> 寫回來</td>
+        <td>收斂移到 <code>post-create.sh</code> 的最後一步（features 跑完之後）</td>
+      </tr>
+      <tr>
+        <td>收斂了 sudo，agent 仍能改防火牆</td>
+        <td>sudoers 裡命令不寫參數 = 允許任意參數，agent 可以指向自己寫的全放行清單
+            重新執行防火牆腳本</td>
+        <td>把參數釘死：<code>NOPASSWD: /usr/local/share/init-firewall.sh ""</code>
+            （<code>""</code> 表示只允許不帶參數）</td>
+      </tr>
+      <tr>
+        <td>agent 無法 commit：<code>Please tell me who you are</code></td>
+        <td>VS Code 的擴充會自動複製主機 <code>.gitconfig</code>，<strong>CLI 不會</strong>。
+            用 Antigravity 只能走 CLI，所以一定會撞到</td>
+        <td><code>post-create.sh</code> 設 <code>user.name</code> / <code>user.email</code></td>
+      </tr>
+      <tr>
+        <td>防火牆啟動時 WARN <code>無法解析 statsig.anthropic.com</code></td>
+        <td>該網域解析不到</td>
+        <td>從白名單移除，少一行噪音</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout lesson">
+    <h3>一個測試方法上的教訓</h3>
+    <p>
+      查「唯讀 mount 會不會擋住 <code>worktree add</code>」時，先在容器外用
+      <code>chmod 444 .git/config</code> 模擬——結果 git 照樣寫成功，差點得出錯誤結論。
+    </p>
+    <p>
+      原因是 <strong>git 不原地改檔案</strong>：它寫一個 <code>.lock</code> 再 <code>rename()</code> 蓋過去，
+      而 <code>rename()</code> 檢查的是<strong>目錄</strong>權限，不是檔案權限。
+      唯讀 bind mount 是掛載層的限制，行為完全不同。
+    </p>
+    <p><strong>mount 的語意只能在真容器裡驗，權限位元模擬不出來。</strong></p>
+  </div>
 </section>
 
 <!-- ============ 差異 ============ -->
