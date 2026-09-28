@@ -1,6 +1,40 @@
 # Personalrecord
  - A training programming website for various types of training, including powerlifting, weightlifting, and aerobic exercise.
 
+## 開發
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # vitest
+npm run build
+```
+
+## Agent 沙箱（devcontainer）
+
+讓 Claude Code / Codex 在隔離容器內全權限執行、不問授權，可平行開多個 agent。
+
+**放 agent 進去之前先 `git push`** ——容器內 `.git` 是可寫的，沒推上去的 commit 有風險。
+
+```bash
+# 起容器 + 進去
+npx @devcontainers/cli up   --workspace-folder . --config .devcontainer/devcontainer.json
+npx @devcontainers/cli exec --workspace-folder . --config .devcontainer/devcontainer.json bash
+
+# 容器內
+claude            # 第一次要登入
+codex login       # 第一次要登入
+verify-sandbox    # 每次都要跑！全 PASS 才往下做（單檔唯讀 mount 會靜默脫鉤）
+agent-wt new feat-a claude @prompts/TEMPLATE.md
+
+# 回主機收成
+agent-wt diff feat-a && git merge agent/feat-a && agent-wt rm feat-a
+```
+
+首次在**新機器**上使用需要兩個前置步驟（git >= 2.48、superpowers 連結），
+新 repo 需要一次 bootstrap。完整說明、擋得住什麼、已知的洞：
+**[docs/agent-sandbox.md](docs/agent-sandbox.md)**
+
 ## GitHub Actions CI/CD Deployment
 
 This project is configured to deploy automatically to GitHub Pages using GitHub Actions.

@@ -1,0 +1,28 @@
+# 出站白名單：一行一個網域。修改後重啟容器生效。
+# 這份是 personalrecord 用的，只留本專案真正需要的來源。
+# 注意：這是 IP 粒度的白名單（啟動時解析），同 IP 上的其他網域擋不住。
+
+# Anthropic / Claude Code
+api.anthropic.com
+claude.ai
+platform.claude.com
+console.anthropic.com
+# statsig.anthropic.com  —— 實測解析不到，移除以免每次啟動都 WARN
+sentry.io
+
+# OpenAI / Codex
+api.openai.com
+auth.openai.com
+chatgpt.com
+
+# 套件來源（本專案只用 npm）
+registry.npmjs.org
+
+# GitHub 內容（github.com 本體的 IP 段由 init-firewall.sh 從 api.github.com/meta 取得）
+raw.githubusercontent.com
+objects.githubusercontent.com
+codeload.github.com
+
+# 刻意不放行：
+#   *.googleapis.com / firestore —— 容器內不給 firebase 憑證，見 docs/agent-sandbox.md
+#   maven / gradle / pypi        —— 本專案沒有這些工具鏈
